@@ -2,16 +2,18 @@
 
 ## Unreleased
 
+- Rename the package and import contract to `@spotsccc/error-as-value`, with direct named imports from the package root.
+- Rename the bundled agent skill to `error-as-value`.
 - Restore dual ESM and CommonJS package entrypoints, including format-specific TypeScript declarations.
 - Add package smoke tests for Node.js `import` and `require` consumers.
-- Refresh and validate the bundled `errore` agent skill for installation from `spotsccc/error-as-value`.
+- Refresh and validate the bundled `error-as-value` agent skill for installation from `spotsccc/error-as-value`.
 - Add CI coverage for build, tests, package contents, and both Node.js module systems.
 
 ## 0.14.1
 
 1. **Fixed `tryFn`/`tryAsync` catch handler accepting non-Error return values** — the `catch` callback previously required returning an `Error` subclass. It now accepts any value: returning `undefined`, `null`, or a fallback value swallows the error and widens the result union accordingly:
    ```ts
-   const result = errore.try({
+   const result = tryFn({
      try: () => JSON.parse(input),
      catch: () => undefined,   // result: ParsedType | undefined
    })
@@ -24,7 +26,7 @@
    // After:
    const result = await fetch(url).catch((e) => new NetworkError({ url, cause: e }))
    ```
-3. **Fixed `errore skill` CLI command** — the SKILL.md file was relocated to `skills/errore/SKILL.md` and the CLI path lookup was updated to match. Running `errore skill` now correctly outputs the skill content.
+3. **Fixed `error-as-value skill` CLI command** — the SKILL.md file was relocated to `skills/error-as-value/SKILL.md` and the CLI path lookup was updated to match. Running `error-as-value skill` now correctly outputs the skill content.
 
 ## 0.14.0
 
@@ -46,16 +48,16 @@
 
 - Add `AbortError` base class and `isAbortError` utility for typed abort/cancellation handling
   - `AbortError` extends `Error` with `name = 'AbortError'` — use as the `extends` base for custom abort errors so `isAbortError` can detect them even when wrapped in a cause chain
-  - `isAbortError(error)` walks the full `.cause` chain, detecting: native `DOMException` from bare `controller.abort()`, direct `errore.AbortError` instances, and tagged errors that extend `errore.AbortError` (where `.name` is overridden to the tag)
+  - `isAbortError(error)` walks the full `.cause` chain, detecting: native `DOMException` from bare `controller.abort()`, direct `AbortError` instances, and tagged errors that extend `AbortError` (where `.name` is overridden to the tag)
   - Handles circular `.cause` references safely with a `Set`
   - 11 new tests covering all detection paths, edge cases, and circular cause protection
 - Document idiomatic `.catch()` pattern for async boundaries (replaces `tryAsync` in all examples)
   - `promise.catch((e) => new MyError({ cause: e }))` is now the canonical form — simpler, no wrapper object, TypeScript infers the union automatically
-  - `errore.tryAsync` still exists but `.catch()` is the preferred style
-  - `errore.try` remains the right tool for sync throwing code (`JSON.parse`, etc.)
+  - `tryAsync` still exists but `.catch()` is the preferred style
+  - `tryFn` remains the right tool for sync throwing code (`JSON.parse`, etc.)
   - Updated SKILL.md rules 12–17, all before/after examples, README, MIGRATION.md, and comparison page
 - Add `controller.abort()` typed reason convention to SKILL.md
-  - `abort(reason)` throws `reason` as-is — MUST pass a tagged error extending `errore.AbortError`, never plain `Error` or string
+  - `abort(reason)` throws `reason` as-is — MUST pass a tagged error extending `AbortError`, never plain `Error` or string
   - New "Abort & Cancellation" recipe section with full before/after example
 - Export `AbortError` and `isAbortError` from the package root
 
@@ -65,13 +67,13 @@
   - Works in every runtime — no native DisposableStack support required
   - Provides `defer()`, `use()`, `adopt()`, `move()` methods with LIFO cleanup ordering
   - Includes SuppressedError fallback for error chaining
-  - 32 tests covering LIFO ordering, double-dispose safety, error chaining, and errore integration patterns
-- Add `/errore-vs-effect` comparison page showing side-by-side code examples of errore vs Effect.ts patterns
+  - 32 tests covering LIFO ordering, double-dispose safety, error chaining, and package integration patterns
+- Add `/error-as-value-vs-effect` comparison page showing side-by-side code examples of Error as Value vs Effect.ts patterns
   - Server-side syntax highlighting with @code-hike/lighter
   - 25+ sections covering error handling, async, retries, timeouts, cleanup, and architecture patterns
   - Light/dark theme toggle via CSS prefers-color-scheme
-- Add benchmarks comparing Effect.gen vs errore performance
-  - errore is 3-8x faster in sync loops, 4-7x faster in async
+- Add benchmarks comparing Effect.gen vs direct error-union performance
+  - Direct error unions are 3-8x faster in sync loops, 4-7x faster in async
   - Near-zero heap allocations vs Effect's kb-range
 - Expand SKILL.md with comprehensive agent-oriented reference
   - 16 self-contained before/after recipe patterns
@@ -92,12 +94,12 @@
 - Include `fingerprint` and `messageTemplate` in `toJSON()` output for structured logging
 - Guard reserved internal keys (`_tag`, `fingerprint`, `messageTemplate`, `name`, `stack`) from being overwritten by user-provided props or template variables
 - Replace `Object.assign(this, args)` in `TaggedError` with key-by-key loop that skips reserved keys
-- Add CLI with `errore skill` command to output SKILL.md contents for LLM context
+- Add CLI with `error-as-value skill` command to output SKILL.md contents for LLM context
 
 ## 0.10.0
 
 - Add `findCause` to walk the `.cause` chain and find an ancestor matching a specific error class (Go's `errors.As` equivalent)
-- Available as instance method on all tagged errors (`.findCause(ErrorClass)`) and as standalone function (`errore.findCause(err, ErrorClass)`)
+- Available as instance method on all tagged errors (`.findCause(ErrorClass)`) and as standalone function (`findCause(err, ErrorClass)`)
 - Returns `T | undefined` for use with optional chaining (`err.findCause(DbError)?.host`)
 - Safe against circular `.cause` references
 - Add docs for `findCause` in README and SKILL.md
@@ -128,8 +130,8 @@
 
 ## 0.7.1
 
-- Export `tryFn` as `try` for cleaner API (`errore.try()` instead of `errore.tryFn()`)
-- Update README and MIGRATION docs to use `import * as errore` (namespace import preferred over named imports)
+- Export `tryFn` as `try` for namespace consumers (`try()` instead of `tryFn()`)
+- Update README and MIGRATION docs to use direct named imports from `@spotsccc/error-as-value`
 
 ## 0.7.0
 

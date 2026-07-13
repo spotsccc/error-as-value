@@ -1,4 +1,4 @@
-// Comparison page renderer for /errore-vs-effect.
+// Comparison page renderer for /error-as-value-vs-effect.
 // Parses the MD content file into sections, highlights code blocks
 // with @code-hike/lighter, renders prose with marked, and outputs
 // a full HTML page with side-by-side comparison layout.
@@ -59,7 +59,7 @@ async function renderSection(section: Section): Promise<string> {
   ])
 
   const leftLabel = 'Effect'
-  const rightLabel = 'errore'
+  const rightLabel = 'Error as Value'
 
   return `
     <section class="comparison-section">
@@ -97,17 +97,17 @@ export async function renderComparisonPage(mdContent: string): Promise<string> {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>errore vs Effect — Side-by-Side Comparison</title>
-  <meta name="description" content="Compare Effect.ts and errore side by side. See how typed error handling looks with each approach." />
-  <meta property="og:title" content="errore vs Effect — Side-by-Side Comparison" />
-  <meta property="og:description" content="Compare Effect.ts and errore side by side. See how typed error handling looks with each approach." />
-  <meta property="og:image" content="https://errore.org/og-errore-vs-effect.png" />
-  <meta property="og:url" content="https://errore.org/errore-vs-effect" />
+  <title>Error as Value vs Effect — Side-by-Side Comparison</title>
+  <meta name="description" content="Compare Effect.ts and Error as Value side by side. See how typed error handling looks with each approach." />
+  <meta property="og:title" content="Error as Value vs Effect — Side-by-Side Comparison" />
+  <meta property="og:description" content="Compare Effect.ts and Error as Value side by side. See how typed error handling looks with each approach." />
+  <meta property="og:image" content="https://raw.githubusercontent.com/spotsccc/error-as-value/main/public/og-image.jpg" />
+  <meta property="og:url" content="https://github.com/spotsccc/error-as-value" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="errore vs Effect — Side-by-Side Comparison" />
-  <meta name="twitter:description" content="Compare Effect.ts and errore side by side. See how typed error handling looks with each approach." />
-  <meta name="twitter:image" content="https://errore.org/og-errore-vs-effect.png" />
+  <meta name="twitter:title" content="Error as Value vs Effect — Side-by-Side Comparison" />
+  <meta name="twitter:description" content="Compare Effect.ts and Error as Value side by side. See how typed error handling looks with each approach." />
+  <meta name="twitter:image" content="https://raw.githubusercontent.com/spotsccc/error-as-value/main/public/og-image.jpg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet" />
@@ -115,8 +115,8 @@ export async function renderComparisonPage(mdContent: string): Promise<string> {
 </head>
 <body>
   <header class="page-header">
-    <a href="/" class="back-link">&larr; errore.org</a>
-    <h1>errore <span class="vs">vs</span> Effect</h1>
+    <a href="/" class="back-link">&larr; Error as Value</a>
+    <h1>Error as Value <span class="vs">vs</span> Effect</h1>
     <p class="subtitle">Side-by-side comparison of typed error handling approaches in TypeScript.</p>
   </header>
   <main>
@@ -124,9 +124,9 @@ export async function renderComparisonPage(mdContent: string): Promise<string> {
   </main>
   <footer class="page-footer">
     <p>
-      <a href="/">errore.org</a> &middot;
+      <a href="/">Error as Value</a> &middot;
       <a href="https://github.com/spotsccc/error-as-value">GitHub</a> &middot;
-      <a href="https://www.npmjs.com/package/errore">npm</a>
+      <a href="https://www.npmjs.com/package/@spotsccc/error-as-value">npm</a>
     </p>
   </footer>
 </body>

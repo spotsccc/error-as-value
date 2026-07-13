@@ -484,11 +484,11 @@ describe('AsyncDisposableStack', () => {
 })
 
 // ============================================================================
-// Integration: errore + DisposableStack
+// Integration: errors as values + DisposableStack
 // ============================================================================
 
-describe('errore + DisposableStack integration', () => {
-  test('defer cleanup with errore error handling pattern', async () => {
+describe('errors as values + DisposableStack integration', () => {
+  test('defer cleanup with error-as-value handling', async () => {
     const log: string[] = []
 
     class DbError extends Error {

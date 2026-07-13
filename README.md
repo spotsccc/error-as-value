@@ -1,12 +1,12 @@
-# errore
+# @spotsccc/error-as-value
 
 Type-safe error handling for TypeScript. Return errors instead of throwing them — as a union type (`Error | T`), not a wrapper. TypeScript's type narrowing does the rest: forget to handle an error and your code won't compile.
 
-This repository is a history-preserving fork of [remorses/errore](https://github.com/remorses/errore), maintained with both ESM and CommonJS package entrypoints and an installable agent skill.
+The package provides ESM and CommonJS entrypoints plus an installable agent skill.
 
 ## Why?
 
-In Go, functions return errors as values instead of throwing exceptions. errore brings the same convention to TypeScript — but instead of a tuple with two separate variables, functions return a single `Error | T` union. You check `instanceof Error` instead of `err != nil`, and TypeScript narrows the type automatically. No wrapper types like `Result<T, E>`, no monads — just plain unions and `instanceof`:
+In Go, functions return errors as values instead of throwing exceptions. This package brings the same convention to TypeScript — but instead of a tuple with two separate variables, functions return a single `Error | T` union. You check `instanceof Error` instead of `err != nil`, and TypeScript narrows the type automatically. No wrapper types like `Result<T, E>`, no monads — just plain unions and `instanceof`:
 
 ```ts
 // Go-style: errors as values
@@ -25,24 +25,22 @@ console.log(user.username) // user is User, fully narrowed
 ## Install
 
 ```sh
-npm install github:spotsccc/error-as-value
+npm install @spotsccc/error-as-value
 ```
-
-The package keeps the upstream name `errore`, so existing imports remain unchanged.
 
 Both module systems are supported:
 
 ```ts
 // ESM
-import * as errore from 'errore'
+import { createTaggedError } from '@spotsccc/error-as-value'
 
 // CommonJS
-const errore = require('errore')
+const { createTaggedError } = require('@spotsccc/error-as-value')
 ```
 
 ## Agent Skill
 
-errore ships with a skill file that teaches AI coding agents the errore convention. Install it with:
+`@spotsccc/error-as-value` ships with a skill that teaches AI coding agents the errors-as-values convention. Install it with:
 
 ```sh
 npx skills add spotsccc/error-as-value
@@ -51,7 +49,7 @@ npx skills add spotsccc/error-as-value
 Then add this to your `AGENTS.md`:
 
 ```
-This codebase uses the errore.org convention. Always read the errore skill before editing TypeScript error handling.
+This codebase uses the errors-as-values convention. Always read the error-as-value skill before editing TypeScript error handling.
 ```
 
 ## Quick Start
@@ -59,15 +57,15 @@ This codebase uses the errore.org convention. Always read the errore skill befor
 Define typed errors with **variable interpolation** and return **Error or Value** directly:
 
 ```ts
-import * as errore from 'errore'
+import { createTaggedError, matchError } from '@spotsccc/error-as-value'
 
 // Define typed errors with $variable interpolation
-class NotFoundError extends errore.createTaggedError({
+class NotFoundError extends createTaggedError({
   name: 'NotFoundError',
   message: 'User $id not found',
 }) {}
 
-class DbError extends errore.createTaggedError({
+class DbError extends createTaggedError({
   name: 'DbError',
   message: 'Database query failed: $reason',
 }) {}
@@ -88,7 +86,7 @@ async function getUser(id: string): Promise<NotFoundError | DbError | User> {
 const user = await getUser('123')
 
 if (user instanceof Error) {
-  const message = errore.matchError(user, {
+  const message = matchError(user, {
     NotFoundError: (e) => `User ${e.id} not found`,
     DbError: (e) => `Database error: ${e.reason}`,
     Error: (e) => `Unexpected error: ${e.message}`,
@@ -106,7 +104,7 @@ console.log(user.name)
 A complete example with **custom base class** and HTTP status codes:
 
 ```ts
-import * as errore from 'errore'
+import { createTaggedError } from '@spotsccc/error-as-value'
 
 // Base class with shared functionality
 class AppError extends Error {
@@ -118,19 +116,19 @@ class AppError extends Error {
 }
 
 // Specific errors with status codes and $variable interpolation
-class NotFoundError extends errore.createTaggedError({
+class NotFoundError extends createTaggedError({
   name: 'NotFoundError',
   message: '$resource not found',
   extends: AppError,
 }) {}
 
-class ValidationError extends errore.createTaggedError({
+class ValidationError extends createTaggedError({
   name: 'ValidationError',
   message: 'Invalid $field: $reason',
   extends: AppError,
 }) {}
 
-class UnauthorizedError extends errore.createTaggedError({
+class UnauthorizedError extends createTaggedError({
   name: 'UnauthorizedError',
 
   extends: AppError,
@@ -178,10 +176,10 @@ app.post('/users/:id', async (req, res) => {
 Create typed errors with **variable interpolation** in the message:
 
 ```ts
-import * as errore from 'errore'
+import { createTaggedError } from '@spotsccc/error-as-value'
 
 // Variables are extracted from the message and required in constructor
-class NotFoundError extends errore.createTaggedError({
+class NotFoundError extends createTaggedError({
   name: 'NotFoundError',
   message: 'User $id not found in $database',
 }) {}
@@ -193,21 +191,21 @@ err.database // 'users'
 err._tag // 'NotFoundError'
 
 // Error without variables
-class EmptyError extends errore.createTaggedError({
+class EmptyError extends createTaggedError({
   name: 'EmptyError',
   message: 'Something went wrong',
 }) {}
 new EmptyError() // no args required
 
 // Message omitted — caller provides it at construction time
-class GenericError extends errore.createTaggedError({
+class GenericError extends createTaggedError({
   name: 'GenericError',
 }) {}
 new GenericError({ message: 'caller decides the message' })
 // fingerprint is stable regardless of what message is passed
 
 // With cause for error chaining
-class WrapperError extends errore.createTaggedError({
+class WrapperError extends createTaggedError({
   name: 'WrapperError',
   message: 'Failed to process $item',
 }) {}
@@ -218,7 +216,7 @@ class AppError extends Error {
   statusCode = 500
 }
 
-class HttpError extends errore.createTaggedError({
+class HttpError extends createTaggedError({
   name: 'HttpError',
   message: 'HTTP $status error',
   extends: AppError,
@@ -259,14 +257,14 @@ if (result instanceof Error) {
 The error definitions:
 
 ```ts
-import * as errore from 'errore'
+import { createTaggedError } from '@spotsccc/error-as-value'
 
-class NotFoundError extends errore.createTaggedError({
+class NotFoundError extends createTaggedError({
   name: 'NotFoundError',
   message: 'User $id not found',
 }) {}
 
-class ServiceError extends errore.createTaggedError({
+class ServiceError extends createTaggedError({
   name: 'ServiceError',
   message: 'Failed to process user $id',
 }) {}
@@ -288,14 +286,14 @@ Caused by: NotFoundError: User 123 not found
 Walk the `.cause` chain to find an ancestor matching a specific error class. Similar to Go's `errors.As` — checks the error itself first, then traverses `.cause` recursively:
 
 ```ts
-import * as errore from 'errore'
+import { createTaggedError, findCause } from '@spotsccc/error-as-value'
 
-class NotFoundError extends errore.createTaggedError({
+class NotFoundError extends createTaggedError({
   name: 'NotFoundError',
   message: 'User $id not found',
 }) {}
 
-class ServiceError extends errore.createTaggedError({
+class ServiceError extends createTaggedError({
   name: 'ServiceError',
   message: 'Failed to process user $id',
 }) {}
@@ -309,7 +307,7 @@ const found = service.findCause(NotFoundError)
 found?.id // '123' — type-safe access
 
 // Standalone function for any Error
-const found2 = errore.findCause(service, NotFoundError)
+const found2 = findCause(service, NotFoundError)
 found2?.id // '123'
 ```
 
@@ -335,7 +333,7 @@ Returns `undefined` if no matching ancestor is found. Safe against circular `.ca
 Use `extends` to inherit from a custom base class. The error will pass `instanceof` for both the base class and the specific error class:
 
 ```ts
-import * as errore from 'errore'
+import { createTaggedError } from '@spotsccc/error-as-value'
 
 class AppError extends Error {
   statusCode = 500
@@ -344,7 +342,7 @@ class AppError extends Error {
   }
 }
 
-class NotFoundError extends errore.createTaggedError({
+class NotFoundError extends createTaggedError({
   name: 'NotFoundError',
   message: 'Resource $id not found',
   extends: AppError,
@@ -377,13 +375,13 @@ if (result instanceof Error) return result // result is NetworkError
 **Wrap exceptions** as error values:
 
 ```ts
-import * as errore from 'errore'
+import { tryAsync, tryFn } from '@spotsccc/error-as-value'
 
 // Sync - wraps exceptions in UnhandledError
-const parsed = errore.try(() => JSON.parse(input))
+const parsed = tryFn(() => JSON.parse(input))
 
 // Sync - with custom error type
-const parsed = errore.try(
+const parsed = tryFn(
   () => JSON.parse(input),
   (e) => new ParseError({ reason: e.message, cause: e }),
 )
@@ -393,8 +391,8 @@ const response = await fetch(url).catch(
   (e) => new NetworkError({ url, cause: e }),
 )
 
-// Async — errore.tryAsync also works, but .catch() is preferred
-const response = await errore.tryAsync(
+// Async — tryAsync also works, but .catch() is preferred
+const response = await tryAsync(
   () => fetch(url),
   (e) => new NetworkError({ url, cause: e }),
 )
@@ -402,42 +400,41 @@ const response = await errore.tryAsync(
 
 > **Best practices for `try` / `tryAsync`:**
 >
-> - **For async code, prefer `.catch()`** — `promise.catch((e) => new MyError({ cause: e }))` is simpler and avoids the wrapper. `errore.tryAsync` still works but `.catch()` is the idiomatic choice.
-> - **Use `errore.try` for sync code** — there's no equivalent of `.catch()` for synchronous throwing calls, so `errore.try(() => JSON.parse(input))` is the right tool.
+> - **For async code, prefer `.catch()`** — `promise.catch((e) => new MyError({ cause: e }))` is simpler and avoids the wrapper. `tryAsync` still works but `.catch()` is the idiomatic choice.
+> - **Use `tryFn` for sync code** — there's no equivalent of `.catch()` for synchronous throwing calls, so `tryFn(() => JSON.parse(input))` is the right tool.
 > - **Use as low as possible in the call stack** — only at boundaries with uncontrolled dependencies (third-party libs, `JSON.parse`, `fetch`, file I/O). Your own functions should return errors as values, never throw.
 > - **Keep the callback minimal** — wrap only the single throwing call, not your business logic. The `try` callback should be a one-liner.
-> - **Always prefer `errore.try` over `errore.tryFn`** — they are the same function, but `try` is the canonical name.
 
 ### Transformations
 
 **Transform and chain** operations:
 
 ```ts
-import * as errore from 'errore'
+import { andThen, map, mapError, tap } from '@spotsccc/error-as-value'
 
 // Transform value (if not error)
-const name = errore.map(user, (u) => u.name)
+const name = map(user, (u) => u.name)
 
 // Transform error
-const appError = errore.mapError(dbError, (e) => new AppError({ cause: e }))
+const appError = mapError(dbError, (e) => new AppError({ cause: e }))
 
 // Chain operations
-const posts = errore.andThen(user, (u) => fetchPosts(u.id))
+const posts = andThen(user, (u) => fetchPosts(u.id))
 
 // Side effects
-const logged = errore.tap(user, (u) => console.log('Got user:', u.name))
+const logged = tap(user, (u) => console.log('Got user:', u.name))
 ```
 
 ### Resource Cleanup (defer)
 
-errore ships `DisposableStack` and `AsyncDisposableStack` polyfills for Go-like `defer` cleanup. Works in every runtime — no native `DisposableStack` support needed:
+`@spotsccc/error-as-value` ships `DisposableStack` and `AsyncDisposableStack` polyfills for Go-like `defer` cleanup. Works in every runtime — no native `DisposableStack` support needed:
 
 ```ts
-import * as errore from 'errore'
+import { AsyncDisposableStack } from '@spotsccc/error-as-value'
 
 async function processRequest(id: string): Promise<DbError | Result> {
   // await using = cleanup runs automatically when scope exits
-  await using cleanup = new errore.AsyncDisposableStack()
+  await using cleanup = new AsyncDisposableStack()
 
   const db = await connectDb()
   cleanup.defer(() => db.close())
@@ -455,8 +452,10 @@ Resources are released in **reverse order** (last deferred = first cleaned up), 
 
 ```ts
 // Sync version with using
+import { DisposableStack } from '@spotsccc/error-as-value'
+
 function readConfig(path: string): ParseError | Config {
-  using cleanup = new errore.DisposableStack()
+  using cleanup = new DisposableStack()
 
   const file = openFileSync(path)
   cleanup.defer(() => file.closeSync())
@@ -471,7 +470,9 @@ function readConfig(path: string): ParseError | Config {
 You can also register existing `Disposable` objects directly:
 
 ```ts
-await using cleanup = new errore.AsyncDisposableStack()
+import { AsyncDisposableStack } from '@spotsccc/error-as-value'
+
+await using cleanup = new AsyncDisposableStack()
 cleanup.use(dbConnection) // calls dbConnection[Symbol.dispose]() on exit
 cleanup.adopt(handle, (h) => h.close()) // custom cleanup for non-disposable values
 ```
@@ -481,23 +482,23 @@ cleanup.adopt(handle, (h) => h.close()) // custom cleanup for non-disposable val
 **Extract values** or throw, **split arrays** by success/error:
 
 ```ts
-import * as errore from 'errore'
+import { match, partition, unwrap, unwrapOr } from '@spotsccc/error-as-value'
 
 // Extract or throw
-const user = errore.unwrap(result)
-const user = errore.unwrap(result, 'Custom error message')
+const user = unwrap(result)
+const user = unwrap(result, 'Custom error message')
 
 // Extract or fallback
-const name = errore.unwrapOr(result, 'Anonymous')
+const name = unwrapOr(result, 'Anonymous')
 
 // Pattern match
-const message = errore.match(result, {
+const message = match(result, {
   ok: (user) => `Hello, ${user.name}`,
   err: (error) => `Failed: ${error.message}`,
 })
 
 // Split array into [successes, errors]
-const [users, errors] = errore.partition(results)
+const [users, errors] = partition(results)
 ```
 
 ### Error Matching
@@ -505,20 +506,24 @@ const [users, errors] = errore.partition(results)
 **Exhaustive pattern matching** with `matchError`. Always assign results to a variable and keep callbacks pure:
 
 ```ts
-import * as errore from 'errore'
+import {
+  createTaggedError,
+  matchError,
+  matchErrorPartial,
+} from '@spotsccc/error-as-value'
 
-class ValidationError extends errore.createTaggedError({
+class ValidationError extends createTaggedError({
   name: 'ValidationError',
   message: 'Invalid $field',
 }) {}
 
-class NetworkError extends errore.createTaggedError({
+class NetworkError extends createTaggedError({
   name: 'NetworkError',
   message: 'Failed to fetch $url',
 }) {}
 
 // Exhaustive matching - Error handler is always required
-const message = errore.matchError(error, {
+const message = matchError(error, {
   ValidationError: (e) => `Invalid ${e.field}`,
   NetworkError: (e) => `Failed to fetch ${e.url}`,
   Error: (e) => `Unexpected: ${e.message}`, // required fallback for plain Error
@@ -526,7 +531,7 @@ const message = errore.matchError(error, {
 console.log(message) // side effects outside callbacks
 
 // Partial matching with fallback
-const fallbackMsg = errore.matchErrorPartial(
+const fallbackMsg = matchErrorPartial(
   error,
   {
     ValidationError: (e) => `Invalid ${e.field}`,
@@ -561,9 +566,9 @@ This works because:
 Naturally combine **error handling with optional values**. No wrapper nesting needed!
 
 ```ts
-import * as errore from 'errore'
+import { createTaggedError } from '@spotsccc/error-as-value'
 
-class NotFoundError extends errore.createTaggedError({
+class NotFoundError extends createTaggedError({
   name: 'NotFoundError',
   message: 'Resource $id not found',
 }) {}
@@ -598,9 +603,9 @@ console.log(user.name)
 | ---------- | ------------------------------------------------ | -------------------------- |
 | Rust       | `Result<Option<T>, E>` or `Option<Result<T, E>>` | Yes, must unwrap in order  |
 | Zig        | `!?T` (error union + optional)                   | Yes, specific syntax       |
-| **errore** | `Error \| T \| null`                             | **No!** Check in any order |
+| **Error as Value** | `Error \| T \| null`                             | **No!** Check in any order |
 
-With errore you **check in any order**:
+With this pattern you **check in any order**:
 
 - Use `?.` and `??` naturally
 - Check `instanceof Error` or `=== null` in any order
@@ -619,7 +624,7 @@ fmt.Println(user.Name)  // Compiles fine, crashes at runtime
 
 The compiler can't save you here. You can ignore `err` entirely and use `user` directly.
 
-With errore, **forgetting to check is impossible**:
+With an `Error | T` union, **forgetting to check is impossible**:
 
 ```ts
 const user = await fetchUser(id) // type: NotFoundError | User
@@ -627,7 +632,7 @@ const user = await fetchUser(id) // type: NotFoundError | User
 console.log(user.id) // TS Error: Property 'id' does not exist on type 'NotFoundError'
 ```
 
-Since errore uses a **single union variable** instead of two separate values, TypeScript forces you to narrow the type before accessing value-specific properties. You literally cannot use the value without first doing an `instanceof Error` check.
+Since the pattern uses a **single union variable** instead of two separate values, TypeScript forces you to narrow the type before accessing value-specific properties. You literally cannot use the value without first doing an `instanceof Error` check.
 
 > **Note:** Properties that exist on both `Error` and your value type (like `name`, `message`) can still be accessed without narrowing. This is a small set of 4 fields: `name`, `message`, `stack`, `cause`.
 
@@ -646,7 +651,7 @@ The caller forgot to assign the result and check `instanceof Error`. TypeScript 
 
 [lintcn](https://github.com/remorses/lintcn) is the [shadcn](https://ui.shadcn.com) for **type-aware** TypeScript lint rules. You add rules by URL, own the source (Go files in `.lintcn/`), and customize freely. Rules use the TypeScript **type checker** — they see resolved types, not just syntax — so they catch things syntax-only linters can't.
 
-lintcn ships a `no-unhandled-error` rule built specifically for the errore convention. It flags any expression statement where the return type includes `Error` (or any Error subclass) and the result is discarded:
+lintcn ships a `no-unhandled-error` rule built specifically for the errors-as-values convention. It flags any expression statement where the return type includes `Error` (or any Error subclass) and the result is discarded:
 
 ```bash
 # Install lintcn
@@ -689,13 +694,13 @@ function wrapper() { return getUser("123") }
 
 Because the rule uses the type checker, it only flags calls that return Error-typed unions — zero false positives on void-returning functions like `console.log` or `arr.push`.
 
-The rule lives in `.lintcn/no_unhandled_error/` — you own the source and can customize it. Combined with errore's `instanceof Error` narrowing, this closes the last gap: every error must be either handled or explicitly discarded with `void`.
+The rule lives in `.lintcn/no_unhandled_error/` — you own the source and can customize it. Combined with `instanceof Error` narrowing, this closes the last gap: every error must be either handled or explicitly discarded with `void`.
 
 ## Comparison with Result Types
 
 **Direct returns** vs wrapper methods:
 
-| Result Pattern         | errore                    |
+| Result Pattern         | Error as Value            |
 | ---------------------- | ------------------------- |
 | `Result.ok(value)`     | just `return value`       |
 | `Result.err(error)`    | just `return error`       |
@@ -727,7 +732,7 @@ console.log(result.value.name) // must unwrap
 ```
 
 ```ts
-// errore
+// Error as Value
 function getUser(id: string): User | NotFoundError {
   const user = db.find(id)
   if (!user) return new NotFoundError({ id })
@@ -744,7 +749,7 @@ console.log(user.name) // it's already the user
 
 **The key insight**: `T | Error` already encodes success/failure. TypeScript's type narrowing does the rest. No wrapper needed.
 
-| Feature             | neverthrow                                   | errore            |
+| Feature             | neverthrow                                   | Error as Value    |
 | ------------------- | -------------------------------------------- | ----------------- |
 | Type-safe errors    | ✓                                            | ✓                 |
 | Exhaustive handling | ✓                                            | ✓                 |
@@ -753,7 +758,7 @@ console.log(user.name) // it's already the user
 | Bundle size         | ~3KB min                                     | **~0 bytes**      |
 | Interop             | Requires wrapping/unwrapping at boundaries   | Native TypeScript |
 
-neverthrow also requires a separate plugin to catch unhandled results. With errore, TypeScript itself prevents you from using a value without checking the error first.
+neverthrow also requires a separate plugin to catch unhandled results. With plain error unions, TypeScript itself prevents you from using a value without checking the error first.
 
 ## Vs Effect.ts
 
@@ -774,7 +779,7 @@ const result = await Effect.runPromise(program)
 ```
 
 ```ts
-// errore - regular TypeScript
+// Error as Value - regular TypeScript
 const user = await fetchUser(id)
 if (user instanceof Error) return []
 
@@ -786,7 +791,7 @@ return posts.filter((p) => p.published)
 
 Effect is powerful if you need its full feature set. But if you just want type-safe errors:
 
-|                  | Effect                                      | errore                              |
+|                  | Effect                                      | Error as Value                      |
 | ---------------- | ------------------------------------------- | ----------------------------------- |
 | Learning curve   | Steep (new paradigm)                        | Minimal (just `instanceof`)         |
 | Codebase impact  | Pervasive (everything becomes an Effect)    | Surgical (adopt incrementally)      |
@@ -797,14 +802,14 @@ Effect is powerful if you need its full feature set. But if you just want type-s
 
 **Use Effect** when you want dependency injection, structured concurrency, and the full functional programming experience.
 
-**Use errore** when you just want type-safe errors without rewriting your codebase.
+**Use Error as Value** when you just want type-safe errors without rewriting your codebase.
 
 ## Zero-Dependency Philosophy
 
-errore is more a **way of writing code** than a library. The core pattern requires nothing:
+Errors as values are more a **way of writing code** than a library. The core pattern requires nothing:
 
 ```ts
-// You can write this without installing errore at all
+// You can write this without installing the package at all
 class NotFoundError extends Error {
   readonly _tag = 'NotFoundError'
   constructor(public id: string) {
@@ -823,7 +828,7 @@ if (user instanceof Error) return user
 console.log(user.name)
 ```
 
-The `errore` package just provides conveniences: `createTaggedError` for less boilerplate, `matchError` for exhaustive pattern matching, `try` for catching sync exceptions (and `.catch()` for async promises). But the core pattern—**errors as union types**—works with zero dependencies.
+The `@spotsccc/error-as-value` package just provides conveniences: `createTaggedError` for less boilerplate, `matchError` for exhaustive pattern matching, `tryFn` for catching sync exceptions (and `.catch()` for async promises). But the core pattern—**errors as union types**—works with zero dependencies.
 
 ### Perfect for Libraries
 
@@ -849,7 +854,11 @@ Your library stays lightweight. Users get type-safe errors without adopting an o
 
 ## Import Style
 
-> **Note:** Always use `import * as errore from 'errore'` instead of named imports. This makes code easier to move between files, and more readable since every function call is **clearly namespaced** (e.g. `errore.isOk()` instead of just `isOk()`).
+Import only the symbols you use directly from `@spotsccc/error-as-value`:
+
+```ts
+import { createTaggedError, isOk } from '@spotsccc/error-as-value'
+```
 
 ## License
 

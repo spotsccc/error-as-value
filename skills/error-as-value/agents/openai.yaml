@@ -1,0 +1,4 @@
+interface:
+  display_name: "Error as Value"
+  short_description: "Typed errors as values for TypeScript"
+  default_prompt: "Use $error-as-value to implement typed error handling without throwing expected failures."

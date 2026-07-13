@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { html, raw } from 'hono/html'
 import { renderComparisonPage } from './comparison-page'
-import comparisonMd from './errore-vs-effect.md'
+import comparisonMd from './error-as-value-vs-effect.md'
 import { css, baseReset, hideScrollbars } from './shared-styles'
 
 const app = new Hono()
@@ -405,7 +405,7 @@ console.log(user.username)
 // Error: Property 'username' does not exist on type 'NotFoundError'`
 
 // Expression vs block
-const codeExpressionVsBlock = `// With errore: error handling is an expression
+const codeExpressionVsBlock = `// With errors as values, error handling is an expression
 const config = parseConfig(input)
 if (config instanceof Error) return config
 const db = connectDB(config.dbUrl)
@@ -435,12 +435,14 @@ if (user instanceof Error) return user
 const username = user?.username ?? 'Guest'`
 
 // Tagged errors
-const codeTaggedErrors = `class NotFoundError extends errore.createTaggedError({
+const codeTaggedErrors = `import { createTaggedError } from '@spotsccc/error-as-value'
+
+class NotFoundError extends createTaggedError({
   name: 'NotFoundError',
   message: 'User $id not found'
 }) {}
 
-class NetworkError extends errore.createTaggedError({
+class NetworkError extends createTaggedError({
   name: 'NetworkError', 
   message: 'Request to $url failed'
 }) {}
@@ -450,15 +452,17 @@ err.message  // "User 123 not found"
 err.id       // "123"`
 
 // Pattern matching
-const codePatternMatch = `// Exhaustive matching - compiler errors if you miss a case
-const message = errore.matchError(error, {
+const codePatternMatch = `import { matchError } from '@spotsccc/error-as-value'
+
+// Exhaustive matching - compiler errors if you miss a case
+const message = matchError(error, {
   NotFoundError: e => \`User \${e.id} not found\`,
   NetworkError: e => \`Failed to reach \${e.url}\`,
   Error: e => \`Unexpected: \${e.message}\`
 })
 
 // Forgot NotFoundError? TypeScript complains:
-errore.matchError(error, {
+matchError(error, {
   NetworkError: e => \`...\`,
   Error: e => \`...\`
 })
@@ -532,8 +536,10 @@ const codeMigrationWrapBefore = `function parseConfig(input: string): Config {
   return JSON.parse(input)  // throws on invalid JSON
 }`
 
-const codeMigrationWrapAfter = `function parseConfig(input: string): ParseError | Config {
-  const result = errore.try(() => JSON.parse(input))
+const codeMigrationWrapAfter = `import { try as tryValue } from '@spotsccc/error-as-value'
+
+function parseConfig(input: string): ParseError | Config {
+  const result = tryValue(() => JSON.parse(input))
   if (result instanceof Error) return new ParseError({ reason: result.message })
   return result
 }`
@@ -570,10 +576,12 @@ const codeMigrationFinallyBefore = `async function importData(url: string, dbUrl
   }
 }`
 
-const codeMigrationFinallyAfter = `async function importData(
+const codeMigrationFinallyAfter = `import { AsyncDisposableStack } from '@spotsccc/error-as-value'
+
+async function importData(
   url: string, dbUrl: string
 ): Promise<ImportError | { rows: number }> {
-  await using cleanup = new errore.AsyncDisposableStack()
+  await using cleanup = new AsyncDisposableStack()
 
   const db = await connectDb(dbUrl)
     .catch(e => new ImportError({ reason: 'db connect', cause: e }))
@@ -610,7 +618,7 @@ if (result.isErr()) {
 }
 console.log(result.value.name)  // must unwrap`
 
-const codeNeverthrowErrore = `// errore
+const codeNeverthrowErrorAsValue = `// Error as Value
 function getUser(id: string): User | NotFoundError {
   const user = db.find(id)
   if (!user) return new NotFoundError({ id })
@@ -625,7 +633,7 @@ if (user instanceof Error) {
 console.log(user.name)  // it's already the user`
 
 // Zero dependency example
-const codeZeroDep = `// You can write this without installing errore at all
+const codeZeroDep = `// The core pattern needs no package
 class NotFoundError extends Error {
   readonly _tag = 'NotFoundError'
   constructor(public id: string) {
@@ -663,10 +671,12 @@ async function processOrder(orderId: string) {
 }`
 
 const codeDeferAfter = `// Go-like defer with await using
-async function processOrder(orderId: string): Promise<DbError | Receipt> {
-  await using cleanup = new errore.AsyncDisposableStack()
+import { AsyncDisposableStack, tryAsync } from '@spotsccc/error-as-value'
 
-  const db = await errore.tryAsync(
+async function processOrder(orderId: string): Promise<DbError | Receipt> {
+  await using cleanup = new AsyncDisposableStack()
+
+  const db = await tryAsync(
     () => connectDb(),
     (e) => new DbError({ orderId, cause: e }),
   )
@@ -696,7 +706,7 @@ const program = pipe(
 
 const result = await Effect.runPromise(program)`
 
-const codeEffectErrore = `// errore - regular TypeScript
+const codeEffectErrorAsValue = `// Error as Value - regular TypeScript
 const user = await fetchUser(id)
 if (user instanceof Error) return []
 
@@ -742,8 +752,8 @@ arr.push(1)`
 // AI Agents skill install
 const codeSkillInstall = `npx skills add spotsccc/error-as-value`
 
-const codeAgentsMd = `This codebase uses the errore.org convention.
-ALWAYS read the errore skill before editing any code.`
+const codeAgentsMd = `This codebase uses errors as values.
+Always read the error-as-value skill before editing TypeScript error handling.`
 
 function Page() {
   return html`
@@ -752,37 +762,46 @@ function Page() {
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Errore - Errors as Values in TypeScript</title>
+        <title>Error as Value - Errors as Values in TypeScript</title>
         <meta
           name="description"
           content="Go-style error handling for TypeScript. Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks."
         />
         <meta
           property="og:title"
-          content="Errore - Go-style Error Handling for TypeScript"
+          content="Error as Value - Go-style Error Handling for TypeScript"
         />
         <meta
           property="og:description"
           content="Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks. Type-safe, zero runtime overhead."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://errore.org" />
-        <meta property="og:image" content="https://errore.org/og-image.jpg" />
+        <meta
+          property="og:url"
+          content="https://github.com/spotsccc/error-as-value"
+        />
+        <meta
+          property="og:image"
+          content="https://raw.githubusercontent.com/spotsccc/error-as-value/main/public/og-image.jpg"
+        />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta
           name="twitter:title"
-          content="Errore - Go-style Error Handling for TypeScript"
+          content="Error as Value - Go-style Error Handling for TypeScript"
         />
         <meta
           name="twitter:description"
           content="Return errors instead of throwing. Unions instead of tuples, instanceof instead of nil checks. Type-safe, zero runtime overhead."
         />
-        <meta name="twitter:image" content="https://errore.org/og-image.jpg" />
+        <meta
+          name="twitter:image"
+          content="https://raw.githubusercontent.com/spotsccc/error-as-value/main/public/og-image.jpg"
+        />
         <meta
           name="twitter:image:alt"
-          content="Errore - Type-safe errors as values for TypeScript"
+          content="Error as Value - Type-safe errors as values for TypeScript"
         />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -813,8 +832,8 @@ function Page() {
 
           <p>
             <span class="intro-letter">I</span>n Go, functions return errors as
-            values instead of throwing exceptions. errore brings the same
-            convention to TypeScript—but instead of Go's two-value tuple (<code
+            values instead of throwing exceptions. Error as Value applies the
+            same convention to TypeScript—but instead of Go's two-value tuple (<code
               >val, err</code
             >), you return a single <code>Error | T</code> union. Instead of
             checking <code>err != nil</code>, you check
@@ -883,10 +902,10 @@ function Page() {
           <h2>AI Agents</h2>
 
           <p>
-            errore is perfect for AI coding agents. When an agent writes code
+            Error as Value is a natural fit for AI coding agents. When an agent writes code
             with try-catch, errors are invisible—the agent can forget a catch
             block, swallow an exception, or miss an error path entirely. With
-            errore, <strong>the compiler won't let it</strong>. Every error is
+            errors as values, <strong>the compiler won't let it</strong>. Every error is
             in the return type. The agent must handle it with
             <code>instanceof</code> before it can access the value. Unhandled
             errors are compile errors, not runtime surprises discovered in
@@ -1011,7 +1030,7 @@ function Page() {
           ><code class="language-typescript">${codeMigrationFinallyAfter}</code></pre>
 
           <p>
-            errore ships <code>DisposableStack</code> and
+            The package ships <code>DisposableStack</code> and
             <code>AsyncDisposableStack</code> polyfills that work in every
             runtime. Use with TypeScript's <code>using</code> /
             <code>await using</code> keywords — no native
@@ -1033,7 +1052,7 @@ function Page() {
 
           <pre
             class="language-typescript"
-          ><code class="language-typescript">${codeNeverthrowErrore}</code></pre>
+          ><code class="language-typescript">${codeNeverthrowErrorAsValue}</code></pre>
 
           <p>
             <strong>The key insight:</strong> <code>T | Error</code> already
@@ -1043,7 +1062,7 @@ function Page() {
 
           <p>
             neverthrow requires a separate plugin to catch unhandled
-            results. With errore, TypeScript itself prevents using a value
+            results. With errors as values, TypeScript itself prevents using a value
             without checking the error first.
           </p>
 
@@ -1061,21 +1080,21 @@ function Page() {
 
           <pre
             class="language-typescript"
-          ><code class="language-typescript">${codeEffectErrore}</code></pre>
+          ><code class="language-typescript">${codeEffectErrorAsValue}</code></pre>
 
           <p>
             <strong>Use Effect</strong> when you want DI, structured
             concurrency, and the full FP experience.
-            <strong>Use errore</strong> when you just want type-safe errors
+            <strong>Use Error as Value</strong> when you just want type-safe errors
             without rewriting your codebase. For resource cleanup, Effect uses
             <code>Scope</code> + <code>acquireRelease</code> +
-            <code>addFinalizer</code>. errore uses native <code>using</code> +
+            <code>addFinalizer</code>. Error as Value uses native <code>using</code> +
             <code>DisposableStack.defer()</code> — same guarantee, zero
             framework.
           </p>
 
           <p>
-            <a href="/errore-vs-effect"
+            <a href="/error-as-value-vs-effect"
               >See the full side-by-side comparison →</a
             >
           </p>
@@ -1083,7 +1102,7 @@ function Page() {
           <h2>Zero-Dependency Philosophy</h2>
 
           <p>
-            errore is more a <strong>way of writing code</strong> than a
+            Error as Value is more a <strong>way of writing code</strong> than a
             library. The core pattern requires nothing:
           </p>
 
@@ -1092,7 +1111,7 @@ function Page() {
           ><code class="language-typescript">${codeZeroDep}</code></pre>
 
           <p>
-            The <code>errore</code> package provides conveniences:
+            The <code>@spotsccc/error-as-value</code> package provides conveniences:
             <code>createTaggedError</code> for less boilerplate,
             <code>matchError</code> for exhaustive matching,
             <code>tryAsync</code> for catching exceptions. But the
@@ -1142,7 +1161,7 @@ function Page() {
 
           <p>
             lintcn ships a <code>no-unhandled-error</code> rule built for the
-            errore convention. It flags any expression statement where the return
+            errors-as-values convention. It flags any expression statement where the return
             type includes <code>Error</code> and the result is discarded:
           </p>
 
@@ -1166,7 +1185,7 @@ function Page() {
             Because the rule uses the type checker, it only flags calls
             returning Error-typed unions. Zero false positives on
             <code>void</code>-returning functions like
-            <code>console.log</code>. Combined with errore's
+            <code>console.log</code>. Combined with
             <code>instanceof</code> narrowing, this gives you complete
             protection: every error must be either handled or explicitly
             discarded with <code>void</code>.
@@ -1176,12 +1195,12 @@ function Page() {
         <footer>
           <pre
             class="language-bash"
-          ><code class="language-bash">npm install github:spotsccc/error-as-value</code></pre>
+          ><code class="language-bash">npm install @spotsccc/error-as-value</code></pre>
           <p>
             <a href="https://github.com/spotsccc/error-as-value">GitHub</a> ·
-            <a href="/errore-vs-effect">errore vs Effect</a> ·
+            <a href="/error-as-value-vs-effect">Error as Value vs Effect</a> ·
             <a href="https://github.com/remorses/lintcn">lintcn</a> · Made by
-            <a href="https://github.com/remorses">remorses</a>
+            <a href="https://github.com/spotsccc">spotsccc</a>
           </p>
         </footer>
 
@@ -1193,21 +1212,11 @@ function Page() {
   `
 }
 
-app.get('/errore-vs-effect', async (c) => {
+app.get('/error-as-value-vs-effect', async (c) => {
   const pageHtml = await renderComparisonPage(comparisonMd)
   return c.html(pageHtml)
 })
 
-app.get('*', (c) => {
-  const url = new URL(c.req.url)
-
-  // Redirect www to non-www
-  if (url.hostname === 'www.errore.org') {
-    url.hostname = 'errore.org'
-    return c.redirect(url.toString(), 301)
-  }
-
-  return c.html(Page())
-})
+app.get('*', (c) => c.html(Page()))
 
 export default app

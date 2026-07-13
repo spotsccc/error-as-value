@@ -247,7 +247,7 @@ describe('mapError', () => {
 })
 
 describe('andThen', () => {
-  test('chains errore-returning functions', () => {
+  test('chains error-returning functions', () => {
     const result = andThen(parseNumber('21'), (n) => n * 2)
 
     expect(result).toBe(42)
@@ -259,7 +259,7 @@ describe('andThen', () => {
     expect(result instanceof Error).toBe(true)
   })
 
-  test('chains multiple errore functions', () => {
+  test('chains multiple error-returning functions', () => {
     function divide(a: number, b: number): ValidationError | number {
       if (b === 0)
         return new ValidationError({
@@ -1783,7 +1783,7 @@ describe('isAbortError', () => {
   })
 
   test('returns false for plain Error passed to abort (not extending AbortError)', () => {
-    // This is why the rule says: MUST use extends: errore.AbortError
+    // This is why custom abort errors must extend AbortError.
     const err = new Error('timeout')
     const wrapped = new Error('network failed', { cause: err })
     expect(isAbortError(wrapped)).toBe(false)

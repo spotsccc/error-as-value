@@ -1,5 +1,5 @@
 {
-  "name": "errore",
+  "name": "@spotsccc/error-as-value",
   "version": "0.14.1",
   "type": "module",
   "description": "Type-safe errors as values for TypeScript. Like Go, but with full type inference.",
@@ -15,7 +15,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "errore": "./dist/cli.js"
+    "error-as-value": "./dist/cli.js"
   },
   "exports": {
     ".": {
@@ -41,7 +41,7 @@
     "test:package": "node scripts/verify-package.mjs",
     "test:install": "node scripts/verify-git-install.mjs",
     "prepare": "npm run build",
-    "bench": "bun run benchmarks/effect-vs-errore.ts",
+    "bench": "bun run benchmarks/effect-vs-error-as-value.ts",
     "bench:create-tagged-error": "bun run benchmarks/create-tagged-error.ts",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy"
@@ -54,7 +54,6 @@
     "go",
     "errors-as-values"
   ],
-  "author": "remorses",
   "license": "MIT",
   "packageManager": "bun@1.3.14",
   "devDependencies": {

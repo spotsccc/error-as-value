@@ -21,16 +21,16 @@ class NetworkError extends Data.TaggedError(
 ```
 
 ```typescript
-import * as errore from 'errore'
+import { createTaggedError } from '@spotsccc/error-as-value'
 
 // !focus(1:4)
-class NotFoundError extends errore.createTaggedError({
+class NotFoundError extends createTaggedError({
   name: 'NotFoundError',
   message: 'User $id not found',
 }) {}
 
 // !focus(1:4)
-class NetworkError extends errore.createTaggedError({
+class NetworkError extends createTaggedError({
   name: 'NetworkError',
   message: 'Request to $url failed',
 }) {}
@@ -40,7 +40,7 @@ class NetworkError extends errore.createTaggedError({
 
 ## The Effect Type
 
-Effect tracks three type parameters for every operation. errore uses a plain union.
+Effect tracks three type parameters for every operation. Error as Value uses a plain union.
 
 ```typescript
 import { Effect } from 'effect'
@@ -87,7 +87,7 @@ console.log(user.name) // User
 
 ## Running the Program
 
-Every Effect program must be executed through a runtime. errore returns plain values — no runtime needed.
+Every Effect program must be executed through a runtime. Error as Value returns plain values — no runtime needed.
 
 ```typescript
 import { Effect } from 'effect'
@@ -241,13 +241,13 @@ const program = fetchUser(id).pipe(
 ```
 
 ```typescript
-import * as errore from 'errore'
+import { matchError } from '@spotsccc/error-as-value'
 
 // !focus(1:10)
 const user = await fetchUser(id)
 
 if (user instanceof Error) {
-  const message = errore.matchError(user, {
+  const message = matchError(user, {
     NotFoundError: e => `User ${e.id} missing`,
     NetworkError: e => `Failed: ${e.url}`,
     Error: e => `Unexpected: ${e.message}`,
@@ -406,14 +406,14 @@ const [errors, users] = await Effect.runPromise(
 ```
 
 ```typescript
-import * as errore from 'errore'
+import { partition } from '@spotsccc/error-as-value'
 
 // !focus(1:10)
 const results = await Promise.all(
   userIds.map((id) => fetchUser(id))
 )
 
-const [users, errors] = errore.partition(results)
+const [users, errors] = partition(results)
 // users: User[], errors: Error[]
 
 errors.forEach((e) =>
@@ -452,8 +452,6 @@ await Effect.runPromise(program)
 ```
 
 ```typescript
-import * as errore from 'errore'
-
 // !focus(1:14)
 async function getUser(
   id: string
@@ -606,8 +604,6 @@ const result = await Effect.runPromise(
 ```
 
 ```typescript
-import * as errore from 'errore'
-
 // !focus(1:17)
 async function fetchWithTimeout(
   id: string
@@ -754,13 +750,13 @@ await Effect.runPromise(program)
 ```
 
 ```typescript
-import * as errore from 'errore'
+import { AsyncDisposableStack } from '@spotsccc/error-as-value'
 
 // !focus(1:18)
 async function queryDb(
   sql: string
 ): Promise<DbError | Row[]> {
-  await using cleanup = new errore.AsyncDisposableStack()
+  await using cleanup = new AsyncDisposableStack()
 
   const conn = createConnection()
   console.log('opened')
@@ -814,13 +810,13 @@ await Effect.runPromise(program)
 ```
 
 ```typescript
-import * as errore from 'errore'
+import { AsyncDisposableStack } from '@spotsccc/error-as-value'
 
 // !focus(1:15)
 // await using = cleanup runs on every exit path
 async function getData(): Promise<FetchError | Data> {
   await using cleanup =
-    new errore.AsyncDisposableStack()
+    new AsyncDisposableStack()
 
   cleanup.defer(() =>
     console.log('Cleanup completed')
@@ -861,12 +857,12 @@ await Effect.runPromise(runnable)
 ```
 
 ```typescript
-import * as errore from 'errore'
+import { AsyncDisposableStack } from '@spotsccc/error-as-value'
 
 // !focus(1:14)
 async function getData(): Promise<FetchError | Data> {
   await using cleanup =
-    new errore.AsyncDisposableStack()
+    new AsyncDisposableStack()
 
   cleanup.defer(() =>
     console.log('Finalizer: done')
@@ -917,14 +913,14 @@ await Effect.runPromise(program)
 ```
 
 ```typescript
-import * as errore from 'errore'
+import { AsyncDisposableStack } from '@spotsccc/error-as-value'
 
 // !focus(1:25)
 async function processOrder(
   orderId: string
 ): Promise<DbError | CacheError | Order> {
   await using cleanup =
-    new errore.AsyncDisposableStack()
+    new AsyncDisposableStack()
 
   const db = await connectDb()
     .catch((e) => new DbError({ orderId, cause: e }))
@@ -980,14 +976,14 @@ await Effect.runPromise(program)
 ```
 
 ```typescript
-import * as errore from 'errore'
+import { AsyncDisposableStack } from '@spotsccc/error-as-value'
 
 // !focus(1:23)
 async function queryWithTimeout(
   sql: string
 ): Promise<DbError | Row[]> {
   await using cleanup =
-    new errore.AsyncDisposableStack()
+    new AsyncDisposableStack()
 
   // AbortController for cancellation
   const controller = new AbortController()
@@ -1004,7 +1000,7 @@ async function queryWithTimeout(
 
   return conn.query(sql)
     .catch((e) => new DbError({ cause: e }))
-  // caller uses errore.isAbortError() to detect timeout
+  // caller uses isAbortError() to detect timeout
   // cleanup: conn.close() → clearTimeout()
 }
 ```
@@ -1061,7 +1057,7 @@ return enriched
 
 ## Dependency Injection
 
-Effect requires Context.Tag, Layer, and provideService to manage dependencies. errore uses plain function parameters.
+Effect requires Context.Tag, Layer, and provideService to manage dependencies. Error as Value uses plain function parameters.
 
 ```typescript
 import { Effect, Context, Layer } from 'effect'
@@ -1098,8 +1094,6 @@ await Effect.runPromise(runnable)
 ```
 
 ```typescript
-import * as errore from 'errore'
-
 // !focus(1:8)
 // Just pass the dependency as a parameter
 async function getUsers(
@@ -1141,13 +1135,13 @@ const program = Effect.gen(function* () {
 ```
 
 ```typescript
-import * as errore from 'errore'
+import { try as tryValue } from '@spotsccc/error-as-value'
 
 // !focus(1:14)
 function parseConfig(
   input: string
 ): ParseError | Config {
-  return errore.try(
+  return tryValue(
     () => JSON.parse(input) as Config,
     (e) => new ParseError({ reason: e.message }),
   )
@@ -1162,7 +1156,7 @@ console.log(config.dbUrl)
 
 ## Library Authoring
 
-Which approach is better for public APIs? Effect requires callers to install and learn the entire Effect ecosystem. errore uses plain TypeScript unions — **zero new dependencies** for your users.
+Which approach is better for public APIs? Effect requires callers to install and learn the entire Effect ecosystem. Error as Value uses plain TypeScript unions — **zero new dependencies** for your users.
 
 ```typescript
 import { Effect } from 'effect'

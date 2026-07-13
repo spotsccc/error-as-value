@@ -1,4 +1,4 @@
-// Benchmark: Effect.gen (generators) vs errore (plain instanceof).
+// Benchmark: Effect.gen (generators) vs Error as Value (plain instanceof).
 // Compares speed and memory for sync and async loops with typed error handling.
 // Run: bun run bench
 //
@@ -7,7 +7,7 @@
 // Both sides do identical work: fetch user by ID → validate → collect results.
 // Every 7th ID triggers NotFoundError, every 13th triggers ValidationError.
 // Effect uses idiomatic Data.TaggedError + Effect.gen + yield*.
-// errore uses TaggedError + instanceof checks.
+// Error as Value uses TaggedError + instanceof checks.
 
 import { run, bench, group, summary, do_not_optimize } from 'mitata'
 import { Effect, Data } from 'effect'
@@ -33,7 +33,7 @@ class EffValidation extends Data.TaggedError('ValidationError')<{
   readonly reason: string
 }> {}
 
-// ── errore errors (TaggedError — idiomatic errore) ───────────────────────────
+// ── Error as Value errors (TaggedError — idiomatic Error as Value) ───────────────────────────
 
 class ErrNotFound extends TaggedError('NotFoundError')<{
   id: number
@@ -70,7 +70,7 @@ function effValidateUser(user: User) {
   return Effect.succeed(user)
 }
 
-// ── errore sync implementations ──────────────────────────────────────────────
+// ── Error as Value sync implementations ──────────────────────────────────────────────
 
 function errFetchUser(id: number): User | ErrNotFound {
   if (id % 7 === 0) return new ErrNotFound({ id })
@@ -94,7 +94,7 @@ function effFetchUserAsync(id: number) {
   })
 }
 
-// ── errore async implementations ─────────────────────────────────────────────
+// ── Error as Value async implementations ─────────────────────────────────────────────
 
 async function errFetchUserAsync(id: number): Promise<User | ErrNotFound> {
   await Promise.resolve()
@@ -132,8 +132,8 @@ group('Sync loop — skip errors, collect successes', () => {
       }
     }).args('n', SIZES)
 
-    // ── errore with instanceof in a for loop ───────────────────────────────
-    bench('errore (instanceof)', function* (state) {
+    // ── Error as Value with instanceof in a for loop ───────────────────────────────
+    bench('Error as Value (instanceof)', function* (state) {
       const n = state.get('n')
       const ids = Array.from({ length: n }, (_, i) => i + 1)
 
@@ -201,7 +201,7 @@ group('Sync loop — short-circuit on first error', () => {
       }
     }).args('n', SIZES)
 
-    bench('errore (instanceof)', function* (state) {
+    bench('Error as Value (instanceof)', function* (state) {
       const n = state.get('n')
       const ids = Array.from({ length: n }, (_, i) => i + 1)
 
@@ -252,8 +252,8 @@ group('Async loop — skip errors, collect successes', () => {
       }
     }).args('n', SIZES)
 
-    // ── errore async with instanceof ───────────────────────────────────────
-    bench('errore async (instanceof)', function* (state) {
+    // ── Error as Value async with instanceof ───────────────────────────────────────
+    bench('Error as Value async (instanceof)', function* (state) {
       const n = state.get('n')
       const ids = Array.from({ length: n }, (_, i) => i + 1)
 

@@ -2,16 +2,16 @@
  * The core type: either an Error or a value T.
  * Unlike Result<T, E>, this is just a union - no wrapper needed.
  */
-export type Errore<T, E extends Error = Error> = E | T
+export type ErrorAsValue<T, E extends Error = Error> = E | T
 
 /**
- * Extract the error type from an Errore union.
+ * Extract the error type from an ErrorAsValue union.
  * @example InferError<NetworkError | User> // NetworkError
  */
 export type InferError<T> = T extends Error ? T : never
 
 /**
- * Extract the value type from an Errore union.
+ * Extract the value type from an ErrorAsValue union.
  * @example InferValue<NetworkError | User> // User
  */
 export type InferValue<T> = T extends Error ? never : T

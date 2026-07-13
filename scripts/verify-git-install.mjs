@@ -10,7 +10,7 @@ const repositoryRoot = path.resolve(
   '..',
 )
 const consumerRoot = fs.mkdtempSync(
-  path.join(os.tmpdir(), 'errore-consumer-'),
+  path.join(os.tmpdir(), 'error-as-value-consumer-'),
 )
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const tsc = path.join(
@@ -44,20 +44,20 @@ try {
   run(process.execPath, [
     '--input-type=module',
     '--eval',
-    "import * as errore from 'errore'; if (typeof errore.createTaggedError !== 'function') process.exit(1)",
+    "import { createTaggedError, matchError } from '@spotsccc/error-as-value'; if (typeof createTaggedError !== 'function' || typeof matchError !== 'function') process.exit(1)",
   ])
   run(process.execPath, [
     '--eval',
-    "const errore = require('errore'); if (typeof errore.createTaggedError !== 'function') process.exit(1)",
+    "const { createTaggedError, matchError } = require('@spotsccc/error-as-value'); if (typeof createTaggedError !== 'function' || typeof matchError !== 'function') process.exit(1)",
   ])
 
   fs.writeFileSync(
     path.join(consumerRoot, 'consumer.mts'),
-    "import * as errore from 'errore'\nclass E extends errore.createTaggedError({ name: 'E', message: 'Failure' }) {}\nnew E()\n",
+    "import { createTaggedError, type ErrorAsValue } from '@spotsccc/error-as-value'\nclass E extends createTaggedError({ name: 'E', message: 'Failure' }) {}\nconst handle = (result: ErrorAsValue<string, E>) => { if (!(result instanceof Error)) result.toUpperCase() }\nhandle(new E())\n",
   )
   fs.writeFileSync(
     path.join(consumerRoot, 'consumer.cts'),
-    "import errore = require('errore')\nclass E extends errore.createTaggedError({ name: 'E', message: 'Failure' }) {}\nnew E()\n",
+    "import { createTaggedError, type ErrorAsValue } from '@spotsccc/error-as-value'\nclass E extends createTaggedError({ name: 'E', message: 'Failure' }) {}\nconst handle = (result: ErrorAsValue<string, E>) => { if (!(result instanceof Error)) result.toUpperCase() }\nhandle(new E())\n",
   )
   run(tsc, [
     '--module',
@@ -72,18 +72,34 @@ try {
     'consumer.cts',
   ])
 
-  const packageRoot = path.join(consumerRoot, 'node_modules', 'errore')
+  const packageRoot = path.join(
+    consumerRoot,
+    'node_modules',
+    '@spotsccc',
+    'error-as-value',
+  )
   const cliOutput = childProcess.execFileSync(
     process.execPath,
     [path.join(packageRoot, 'dist', 'cli.js'), 'skill'],
     { encoding: 'utf8' },
   )
-  const skillPath = path.join(packageRoot, 'skills', 'errore', 'SKILL.md')
+  const skillPath = path.join(
+    packageRoot,
+    'skills',
+    'error-as-value',
+    'SKILL.md',
+  )
 
   assert.equal(cliOutput, fs.readFileSync(skillPath, 'utf8'))
   assert.ok(
     fs.existsSync(
-      path.join(packageRoot, 'skills', 'errore', 'agents', 'openai.yaml'),
+      path.join(
+        packageRoot,
+        'skills',
+        'error-as-value',
+        'agents',
+        'openai.yaml',
+      ),
     ),
   )
 } finally {

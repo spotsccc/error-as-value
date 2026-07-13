@@ -4,12 +4,21 @@ import childProcess from 'node:child_process'
 import module from 'node:module'
 import url from 'node:url'
 
-import * as esm from 'errore'
+import {
+  createTaggedError,
+  matchError,
+} from '@spotsccc/error-as-value'
 
 const require = module.createRequire(import.meta.url)
-const cjs = require('errore')
+const {
+  createTaggedError: createTaggedErrorCjs,
+  matchError: matchErrorCjs,
+} = require('@spotsccc/error-as-value')
 
-for (const api of [esm, cjs]) {
+for (const api of [
+  { createTaggedError, matchError },
+  { createTaggedError: createTaggedErrorCjs, matchError: matchErrorCjs },
+]) {
   assert.equal(typeof api.createTaggedError, 'function')
   assert.equal(typeof api.matchError, 'function')
 
@@ -25,7 +34,7 @@ for (const api of [esm, cjs]) {
 
 const cliPath = url.fileURLToPath(new URL('../dist/cli.js', import.meta.url))
 const skillPath = url.fileURLToPath(
-  new URL('../skills/errore/SKILL.md', import.meta.url),
+  new URL('../skills/error-as-value/SKILL.md', import.meta.url),
 )
 const cliOutput = childProcess.execFileSync(process.execPath, [cliPath, 'skill'], {
   encoding: 'utf8',

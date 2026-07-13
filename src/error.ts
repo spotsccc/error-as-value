@@ -305,10 +305,12 @@ export function matchErrorPartial<E extends Error, R>(
  * even when wrapped in a cause chain.
  *
  * @example
- * class TimeoutError extends errore.createTaggedError({
+ * import { AbortError, createTaggedError } from '@spotsccc/error-as-value'
+ *
+ * class TimeoutError extends createTaggedError({
  *   name: 'TimeoutError',
  *   message: 'Request timed out for $operation',
- *   extends: errore.AbortError,
+ *   extends: AbortError,
  * }) {}
  *
  * controller.abort(new TimeoutError({ operation: 'fetch' }))
@@ -322,13 +324,15 @@ export class AbortError extends Error {
 
 /**
  * Check if an error (or any error in its `.cause` chain) is an abort error.
- * Detects native AbortError (DOMException), errore.AbortError, and any
- * tagged error that extends errore.AbortError.
+ * Detects native AbortError (DOMException), this package's AbortError, and any
+ * tagged error that extends it.
  *
  * @example
+ * import { isAbortError } from '@spotsccc/error-as-value'
+ *
  * const res = await fetch(url, { signal })
  *   .catch((e) => new NetworkError({ url, cause: e }))
- * if (errore.isAbortError(res)) {
+ * if (isAbortError(res)) {
  *   // request was aborted — timeout, user cancel, etc.
  * }
  */

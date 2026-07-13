@@ -1,6 +1,6 @@
 # Before & After: Fetching a Todo
 
-Four progressive examples showing how errore eliminates nested try/catch while keeping full type safety. Each step adds real-world complexity: retries, timeouts, and tracing.
+Four progressive examples showing how Error as Value eliminates nested try/catch while keeping full type safety. Each step adds real-world complexity: retries, timeouts, and tracing.
 
 ---
 
@@ -40,14 +40,14 @@ async function getTodo(
 ### After
 
 ```ts
-import * as errore from 'errore'
+import { createTaggedError } from '@spotsccc/error-as-value'
 
-class InvalidJsonError extends errore.createTaggedError({
+class InvalidJsonError extends createTaggedError({
   name: 'InvalidJsonError',
   message: 'Failed to parse response for todo $id',
 }) {}
 
-class RequestFailedError extends errore.createTaggedError({
+class RequestFailedError extends createTaggedError({
   name: 'RequestFailedError',
   message: 'Request failed for todo $id',
 }) {}
@@ -83,11 +83,13 @@ async function getTodo(
 ### Caller
 
 ```ts
+import { matchError } from '@spotsccc/error-as-value'
+
 const result = await getTodo(1)
 
 if (result instanceof Error) {
   // Exhaustive match on error type
-  const msg = errore.matchError(result, {
+  const msg = matchError(result, {
     InvalidJsonError: (e) => `Bad JSON for todo ${e.id}`,
     RequestFailedError: (e) => `Fetch failed for todo ${e.id}`,
     Error: (e) => `Unexpected: ${e.message}`,
@@ -159,16 +161,16 @@ function getTodo(
 ### After
 
 ```ts
-import * as errore from 'errore'
+import { createTaggedError } from '@spotsccc/error-as-value'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-class InvalidJsonError extends errore.createTaggedError({
+class InvalidJsonError extends createTaggedError({
   name: 'InvalidJsonError',
   message: 'Failed to parse response for todo $id',
 }) {}
 
-class RequestFailedError extends errore.createTaggedError({
+class RequestFailedError extends createTaggedError({
   name: 'RequestFailedError',
   message: 'Request failed for todo $id after $attempts attempts',
 }) {}
@@ -314,24 +316,28 @@ function getTodo(
 ### After
 
 ```ts
-import * as errore from 'errore'
+import {
+  AbortError,
+  createTaggedError,
+  isAbortError,
+} from '@spotsccc/error-as-value'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-class InvalidJsonError extends errore.createTaggedError({
+class InvalidJsonError extends createTaggedError({
   name: 'InvalidJsonError',
   message: 'Failed to parse response for todo $id',
 }) {}
 
-class RequestFailedError extends errore.createTaggedError({
+class RequestFailedError extends createTaggedError({
   name: 'RequestFailedError',
   message: 'Request failed for todo $id after $attempts attempts',
 }) {}
 
-class TimeoutError extends errore.createTaggedError({
+class TimeoutError extends createTaggedError({
   name: 'TimeoutError',
   message: 'Request timed out for todo $id',
-  extends: errore.AbortError,
+  extends: AbortError,
 }) {}
 
 async function getTodo(
@@ -371,7 +377,7 @@ async function getTodo(
     signal?.removeEventListener('abort', onAbort)
 
     // Abort errors (timeout) are never retried
-    if (errore.isAbortError(response)) return response
+    if (isAbortError(response)) return response
 
     if (response instanceof Error) {
       if (attempt < retries) {
@@ -416,9 +422,9 @@ async function getTodo(
 
 **What changed:**
 
-- `TimeoutError extends errore.AbortError` — a typed abort reason instead of `(error as Error).name === "AbortError"` string checks
-- `controller.abort(new TimeoutError(...))` passes a typed reason — the browser's `AbortError` wraps it as the cause, so `errore.isAbortError()` can detect it inside the `RequestFailedError` cause chain
-- Timeout is explicitly never retried (`if (errore.isAbortError(response)) return response`) — this policy is visible, not buried in a conditional
+- `TimeoutError extends AbortError` — a typed abort reason instead of `(error as Error).name === "AbortError"` string checks
+- `controller.abort(new TimeoutError(...))` passes a typed reason — the browser's `AbortError` wraps it as the cause, so `isAbortError()` can detect it inside the `RequestFailedError` cause chain
+- Timeout is explicitly never retried (`if (isAbortError(response)) return response`) — this policy is visible, not buried in a conditional
 - Signal listener cleanup with `removeEventListener` and `{ once: true }`
 - `TimeoutError` doesn't appear in the return type — it's inside `RequestFailedError`'s cause chain, not returned directly
 
@@ -520,25 +526,29 @@ function getTodo(
 ### After
 
 ```ts
-import * as errore from 'errore'
+import {
+  AbortError,
+  createTaggedError,
+  isAbortError,
+} from '@spotsccc/error-as-value'
 
 const tracer = Otel.trace.getTracer('todos')
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-class InvalidJsonError extends errore.createTaggedError({
+class InvalidJsonError extends createTaggedError({
   name: 'InvalidJsonError',
   message: 'Failed to parse response for todo $id',
 }) {}
 
-class RequestFailedError extends errore.createTaggedError({
+class RequestFailedError extends createTaggedError({
   name: 'RequestFailedError',
   message: 'Request failed for todo $id after $attempts attempts',
 }) {}
 
-class TimeoutError extends errore.createTaggedError({
+class TimeoutError extends createTaggedError({
   name: 'TimeoutError',
   message: 'Request timed out for todo $id',
-  extends: errore.AbortError,
+  extends: AbortError,
 }) {}
 
 async function getTodo(
@@ -599,7 +609,7 @@ async function getTodo(
       signal?.removeEventListener('abort', onAbort)
 
       // Abort errors (timeout) are never retried
-      if (errore.isAbortError(response)) return response
+      if (isAbortError(response)) return response
 
       if (response instanceof Error) {
         if (attempt < retries) {
@@ -655,7 +665,7 @@ async function getTodo(
 
 ## Summary
 
-| Concern                  | `{ ok, error }` pattern                      | errore                                          |
+| Concern                  | `{ ok, error }` pattern                      | Error as Value                                  |
 | ------------------------ | -------------------------------------------- | ----------------------------------------------- |
 | Error types              | String literals (`"InvalidJson"`)            | Real classes with typed properties              |
 | Type safety at call site | Manual `result.ok` check                     | `instanceof Error` narrows the union            |
@@ -717,19 +727,22 @@ async function processOrder(
 ### After
 
 ```ts
-import * as errore from 'errore'
+import {
+  AsyncDisposableStack,
+  createTaggedError,
+} from '@spotsccc/error-as-value'
 
-class DbError extends errore.createTaggedError({
+class DbError extends createTaggedError({
   name: 'DbError',
   message: 'Database operation failed for order $orderId',
 }) {}
 
-class CacheError extends errore.createTaggedError({
+class CacheError extends createTaggedError({
   name: 'CacheError',
   message: 'Cache operation failed for order $orderId',
 }) {}
 
-class ProcessingError extends errore.createTaggedError({
+class ProcessingError extends createTaggedError({
   name: 'ProcessingError',
   message: 'Payment processing failed for order $orderId',
 }) {}
@@ -737,7 +750,7 @@ class ProcessingError extends errore.createTaggedError({
 async function processOrder(
   orderId: string,
 ): Promise<DbError | CacheError | ProcessingError | Receipt> {
-  await using cleanup = new errore.AsyncDisposableStack()
+  await using cleanup = new AsyncDisposableStack()
 
   const db = await connectDb().catch((e) => new DbError({ orderId, cause: e }))
   if (db instanceof Error) return db
@@ -767,7 +780,7 @@ async function processOrder(
 
 **What changed:**
 
-- `await using cleanup = new errore.AsyncDisposableStack()` replaces all nested try/finally blocks
+- `await using cleanup = new AsyncDisposableStack()` replaces all nested try/finally blocks
 - `cleanup.defer()` registers cleanup in the order resources are acquired — they run in reverse (LIFO), so cache flushes before db closes
 - Cleanup runs on every exit path: normal return, early error return, or thrown exception
 - Adding more resources is just another `cleanup.defer()` — no extra nesting
@@ -809,7 +822,7 @@ const processOrder = (orderId: string) =>
   )
 ```
 
-**Comparison:** Effect's `acquireRelease` + `Effect.scoped` provides the same guarantee — resources are always cleaned up. But it requires wrapping everything in the Effect system: `Effect.flatMap`, `Effect.gen`, `yield*`, and `Effect.scoped`. errore uses native `await using` + `DisposableStack` — the same cleanup guarantee with plain async/await.
+**Comparison:** Effect's `acquireRelease` + `Effect.scoped` provides the same guarantee — resources are always cleaned up. But it requires wrapping everything in the Effect system: `Effect.flatMap`, `Effect.gen`, `yield*`, and `Effect.scoped`. Error as Value uses native `await using` + `DisposableStack` — the same cleanup guarantee with plain async/await.
 
 ---
 
@@ -871,17 +884,17 @@ return Effect.gen(function* () {
 - JSX is buried inside `Effect.succeed(...)` wrappers
 - Reading order is bottom-up: you see the error handlers last, far from where errors originate
 
-### After (errore)
+### After (Error as Value)
 
 ```tsx
-import * as errore from 'errore'
+import { createTaggedError } from '@spotsccc/error-as-value'
 
-class PolicyDeniedError extends errore.createTaggedError({
+class PolicyDeniedError extends createTaggedError({
   name: 'PolicyDeniedError',
   message: 'Access denied for video $videoId',
 }) {}
 
-class VerifyVideoPasswordError extends errore.createTaggedError({
+class VerifyVideoPasswordError extends createTaggedError({
   name: 'VerifyVideoPasswordError',
   message: 'Video $videoId requires password verification',
 }) {}

@@ -1,4 +1,4 @@
-# Migrating to errore
+# Migrating to Error as Value
 
 This guide shows how to migrate a TypeScript codebase from try-catch exceptions to type-safe errors as values, Go-style.
 
@@ -51,32 +51,32 @@ Create typed errors for your domain using `createTaggedError`:
 
 ```ts
 // errors.ts
-import * as errore from 'errore'
+import { createTaggedError } from '@spotsccc/error-as-value'
 
 // Database errors
-class DbConnectionError extends errore.createTaggedError({
+class DbConnectionError extends createTaggedError({
   name: 'DbConnectionError',
 }) {}
 
-class RecordNotFoundError extends errore.createTaggedError({
+class RecordNotFoundError extends createTaggedError({
   name: 'RecordNotFoundError',
   message: '$table with id $id not found',
 }) {}
 
 // Network errors
-class NetworkError extends errore.createTaggedError({
+class NetworkError extends createTaggedError({
   name: 'NetworkError',
   message: 'Request to $url failed: $reason',
 }) {}
 
 // Validation errors
-class ValidationError extends errore.createTaggedError({
+class ValidationError extends createTaggedError({
   name: 'ValidationError',
   message: 'Invalid $field: $reason',
 }) {}
 
 // Auth errors
-class UnauthorizedError extends errore.createTaggedError({
+class UnauthorizedError extends createTaggedError({
   name: 'UnauthorizedError',
   message: 'Unauthorized',
 }) {}
@@ -99,8 +99,6 @@ async function getUserById(id: string): Promise<User> {
 ### After: Function returns error or value
 
 ```ts
-import * as errore from 'errore'
-
 async function getUserById(
   id: string,
 ): Promise<DbConnectionError | RecordNotFoundError | User> {
@@ -161,13 +159,13 @@ async function getFullUser(id: string): Promise<GetFullUserError | FullUser> {
 At your API handlers or entry points, handle all errors explicitly:
 
 ```ts
-import * as errore from 'errore'
+import { matchError } from '@spotsccc/error-as-value'
 
 app.get('/users/:id', async (req, res) => {
   const user = await getFullUser(req.params.id)
 
   if (user instanceof Error) {
-    const response = errore.matchError(user, {
+    const response = matchError(user, {
       RecordNotFoundError: (e) => ({
         status: 404,
         body: { error: `${e.table} ${e.id} not found` },
@@ -189,14 +187,14 @@ app.get('/users/:id', async (req, res) => {
 
 ### Wrapping External Libraries
 
-Use `errore.try` for sync, `.catch()` for async:
+Use `try` from `@spotsccc/error-as-value` for sync code and `.catch()` for async code:
 
 ```ts
-import * as errore from 'errore'
+import { try as tryValue } from '@spotsccc/error-as-value'
 
 // Sync: JSON parsing
 function parseJson(input: string): ValidationError | unknown {
-  const result = errore.try({
+  const result = tryValue({
     try: () => JSON.parse(input),
     catch: () => new ValidationError({ field: 'json', reason: 'Invalid JSON' }),
   })
@@ -226,8 +224,6 @@ async function fetchJson<T>(url: string): Promise<NetworkError | T> {
 Combine error handling with optional values naturally:
 
 ```ts
-import * as errore from 'errore'
-
 async function findUserByEmail(
   email: string,
 ): Promise<DbConnectionError | User | null> {
@@ -280,8 +276,6 @@ function validateCreateUser(input: unknown): ValidationError | CreateUserInput {
 ### Multiple Sequential Operations
 
 ```ts
-import * as errore from 'errore'
-
 async function createUserWithProfile(
   input: CreateUserInput,
 ): Promise<ValidationError | DbConnectionError | User> {
@@ -336,7 +330,7 @@ async function getUserDashboard(
 
 ### Replacing `let` + try-catch with Expressions
 
-A common pattern is declaring a variable with `let`, then assigning inside try-catch for error recovery. This is ugly and error-prone. errore makes these into clean expressions.
+A common pattern is declaring a variable with `let`, then assigning inside try-catch for error recovery. This is ugly and error-prone. Error as Value turns these into clean expressions.
 
 #### Pattern 1: Fallback value on error
 
@@ -351,13 +345,13 @@ try {
 }
 ```
 
-**After:** Use `errore.unwrapOr` for a one-liner
+**After:** Use `unwrapOr` for a one-liner
 
 ```ts
-import * as errore from 'errore'
+import { try as tryValue, unwrapOr } from '@spotsccc/error-as-value'
 
-const config = errore.unwrapOr(
-  errore.try(() => JSON.parse(fs.readFileSync('config.json', 'utf-8'))),
+const config = unwrapOr(
+  tryValue(() => JSON.parse(fs.readFileSync('config.json', 'utf-8'))),
   { port: 3000, debug: false },
 )
 ```
@@ -420,12 +414,12 @@ while (attempts < 3) {
 **After:** Loop with early break
 
 ```ts
-import * as errore from 'errore'
+import { isOk } from '@spotsccc/error-as-value'
 
 async function fetchWithRetry(): Promise<NetworkError | Data> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const result = await fetchData()
-    if (errore.isOk(result)) return result
+    if (isOk(result)) return result
 
     if (attempt < 2) await sleep(1000) // don't sleep on last attempt
   }
@@ -452,13 +446,13 @@ for (const id of ids) {
 }
 ```
 
-**After:** Use `errore.partition` or filter
+**After:** Use `partition` or filter
 
 ```ts
-import * as errore from 'errore'
+import { partition } from '@spotsccc/error-as-value'
 
 const allResults = await Promise.all(ids.map(fetchItem))
-const [items, errors] = errore.partition(allResults)
+const [items, errors] = partition(allResults)
 
 // Log errors if needed
 errors.forEach((e) => console.warn('Failed:', e.message))
@@ -505,7 +499,7 @@ try {
 **After:** Explicit flow
 
 ```ts
-import * as errore from 'errore'
+import { isOk } from '@spotsccc/error-as-value'
 
 const cached = cache.get(key) // returns Data | null
 
@@ -513,7 +507,7 @@ const data =
   cached ??
   (await (async () => {
     const fetched = await fetchFromDb(key)
-    if (errore.isOk(fetched)) cache.set(key, fetched)
+    if (isOk(fetched)) cache.set(key, fetched)
     return fetched
   })())
 ```
@@ -521,14 +515,14 @@ const data =
 Or simpler:
 
 ```ts
-import * as errore from 'errore'
+import { isOk } from '@spotsccc/error-as-value'
 
 async function getWithCache(key: string): Promise<DbError | Data> {
   const cached = cache.get(key)
   if (cached) return cached
 
   const fetched = await fetchFromDb(key)
-  if (errore.isOk(fetched)) cache.set(key, fetched)
+  if (isOk(fetched)) cache.set(key, fetched)
 
   return fetched
 }
@@ -551,17 +545,17 @@ try {
 }
 ```
 
-**After:** Chain with `??` and `errore.isOk`
+**After:** Chain with `??` and `isOk`
 
 ```ts
-import * as errore from 'errore'
+import { isOk } from '@spotsccc/error-as-value'
 
 const envConfig = loadFromEnv() // ConfigError | Config
 const fileConfig = loadFromFile() // ConfigError | Config
 
-const config = errore.isOk(envConfig)
+const config = isOk(envConfig)
   ? envConfig
-  : errore.isOk(fileConfig)
+  : isOk(fileConfig)
     ? fileConfig
     : defaultConfig
 ```
@@ -569,14 +563,14 @@ const config = errore.isOk(envConfig)
 Or as a function:
 
 ```ts
-import * as errore from 'errore'
+import { isOk } from '@spotsccc/error-as-value'
 
 function loadConfig(): Config {
   const sources = [loadFromEnv, loadFromFile]
 
   for (const load of sources) {
     const result = load()
-    if (errore.isOk(result)) return result
+    if (isOk(result)) return result
   }
 
   return defaultConfig
@@ -601,18 +595,18 @@ This makes code:
 You can convert one function at a time. Use `unwrap` at boundaries:
 
 ```ts
-import * as errore from 'errore'
+import { unwrap } from '@spotsccc/error-as-value'
 
-// New code using errore
+// New code using errors as values
 async function getUser(id: string): Promise<DbConnectionError | User> {
   // ... returns error or value
 }
 
-// Old code that expects throws - use errore.unwrap at the boundary
+// Old code that expects throws - use unwrap at the boundary
 async function legacyHandler(id: string) {
   const user = await getUser(id)
-  // errore.unwrap throws if error, returns value otherwise
-  return errore.unwrap(user, 'Failed to get user')
+  // unwrap throws if error, returns value otherwise
+  return unwrap(user, 'Failed to get user')
 }
 ```
 
@@ -710,6 +704,8 @@ function processOrder(order: Order): ProcessError | Receipt {
 ### Avoid try-catch nesting
 
 ```ts
+import { try as tryValue } from '@spotsccc/error-as-value'
+
 // before
 async function loadConfig(): Promise<Config> {
   try {
@@ -735,7 +731,7 @@ async function loadConfig(): Promise<Config> {
     .catch((e) => new ConfigError({ reason: 'Read failed', cause: e }))
   if (raw instanceof Error) return { port: 3000 }
 
-  const parsed = errore.try({
+  const parsed = tryValue({
     try: () => JSON.parse(raw) as Config,
     catch: (e) => new ConfigError({ reason: 'Invalid JSON', cause: e }),
   })
@@ -827,6 +823,8 @@ const config: Config = (() => {
 ### Custom Base Classes
 
 ```ts
+import { createTaggedError } from '@spotsccc/error-as-value'
+
 // before
 class AppError extends Error {
   statusCode = 500
@@ -854,7 +852,7 @@ class AppError extends Error {
   }
 }
 
-class NotFoundError extends errore.createTaggedError({
+class NotFoundError extends createTaggedError({
   name: 'NotFoundError',
   message: 'Resource $id not found',
   extends: AppError,
@@ -921,10 +919,10 @@ async function processRequest(id: string) {
 }
 
 // after — Go-like defer with DisposableStack
-import * as errore from 'errore'
+import { AsyncDisposableStack } from '@spotsccc/error-as-value'
 
 async function processRequest(id: string): Promise<DbError | Result> {
-  await using cleanup = new errore.AsyncDisposableStack()
+  await using cleanup = new AsyncDisposableStack()
 
   const db = await connectDb().catch((e) => new DbError({ cause: e }))
   if (db instanceof Error) return db
@@ -959,15 +957,17 @@ if (dbErr) {
 ### Abort & Cancellation
 
 ```ts
+import { AbortError, createTaggedError } from '@spotsccc/error-as-value'
+
 // before — plain Error or string, isAbortError can't detect it
 controller.abort(new Error('timeout'))
 controller.abort('timeout')
 
 // after — typed error extending AbortError
-class TimeoutError extends errore.createTaggedError({
+class TimeoutError extends createTaggedError({
   name: 'TimeoutError',
   message: 'Request timed out for $operation',
-  extends: errore.AbortError,
+  extends: AbortError,
 }) {}
 controller.abort(new TimeoutError({ operation: 'fetch' }))
 ```
@@ -975,13 +975,15 @@ controller.abort(new TimeoutError({ operation: 'fetch' }))
 ### Flat abort checks
 
 ```ts
+import { isAbortError, tryAsync } from '@spotsccc/error-as-value'
+
 // before — isAbortError hidden inside instanceof
-const result = await errore.tryAsync({
+const result = await tryAsync({
   try: () => fetchData({ signal }),
   catch: (e) => new FetchError({ cause: e }),
 })
 if (result instanceof Error) {
-  if (errore.isAbortError(result)) {
+  if (isAbortError(result)) {
     return 'Request timed out'
   }
   return `Failed: ${result.message}`
@@ -991,7 +993,7 @@ if (result instanceof Error) {
 const result = await fetchData({ signal }).catch(
   (e) => new FetchError({ cause: e }),
 )
-if (errore.isAbortError(result)) return 'Request timed out'
+if (isAbortError(result)) return 'Request timed out'
 if (result instanceof Error) return `Failed: ${result.message}`
 ```
 
@@ -1070,10 +1072,10 @@ if (emailResult instanceof Error) {
 ## Quick Reference
 
 ```ts
-import * as errore from 'errore'
+import { createTaggedError, matchError } from '@spotsccc/error-as-value'
 
 // Define errors with $variable interpolation
-class MyError extends errore.createTaggedError({
+class MyError extends createTaggedError({
   name: 'MyError',
   message: 'Operation failed: $reason',
 }) {}
@@ -1091,7 +1093,7 @@ if (result instanceof Error) return result
 
 // Handle at top level
 if (result instanceof Error) {
-  const msg = errore.matchError(result, {
+  const msg = matchError(result, {
     MyError: (e) => e.reason,
     Error: (e) => `Unknown: ${e.message}`, // required fallback for plain Error
   })

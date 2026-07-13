@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "errore",
+      "name": "@spotsccc/error-as-value",
       "devDependencies": {
         "@code-hike/lighter": "^1.0.3",
         "@types/node": "^24.0.0",

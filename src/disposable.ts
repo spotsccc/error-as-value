@@ -21,10 +21,10 @@ type AsyncDisposeMethod = () => void | Promise<void>
  * Go-like `defer` semantics for synchronous resource management.
  *
  * @example
- * import * as errore from 'errore'
+ * import { DisposableStack } from '@spotsccc/error-as-value'
  *
  * function processFile(path: string) {
- *   using cleanup = new errore.DisposableStack()
+ *   using cleanup = new DisposableStack()
  *
  *   const file = openFileSync(path)
  *   cleanup.defer(() => file.closeSync())
@@ -129,10 +129,10 @@ export class DisposableStack implements Disposable {
  * Go-like `defer` semantics for async resource management.
  *
  * @example
- * import * as errore from 'errore'
+ * import { AsyncDisposableStack } from '@spotsccc/error-as-value'
  *
  * async function handleRequest(id: string) {
- *   await using cleanup = new errore.AsyncDisposableStack()
+ *   await using cleanup = new AsyncDisposableStack()
  *
  *   const db = await connectDb()
  *   cleanup.defer(async () => await db.close())

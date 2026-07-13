@@ -1,9 +1,9 @@
 ---
-name: errore
-description: Use the errore "errors as values" convention in TypeScript repositories. Apply when code returns Error | T unions, uses the errore package, converts throwing dependencies at boundaries, defines or reviews typed errors, or handles cancellation and cause chains. Prefer the smallest useful error model and avoid creating a tagged class, wrapper, constructor, or property without a current consumer. Do not introduce errore where another error model is already established unless the user requests a migration.
+name: error-as-value
+description: Apply the errors-as-values convention in TypeScript repositories that use @spotsccc/error-as-value or Error | T return unions. Use when implementing or reviewing typed errors, converting throwing dependencies at boundaries, adapting value errors to exception-based consumers, or handling cancellation and cause chains. Prefer the smallest useful error model. Do not introduce this convention where another error model is established unless the user requests a migration.
 ---
 
-# errore
+# Error as Value
 
 Use errors as values: functions return `Error | T`, callers narrow with `instanceof Error`, and expected failures do not throw.
 
@@ -16,7 +16,7 @@ return user.name;
 
 ## Core rules
 
-1. Follow the repository's existing error convention. Use `import * as errore from 'errore'` in ESM/TypeScript or `const errore = require('errore')` in CommonJS.
+1. Follow the repository's existing error convention. Import only the symbols in use directly from `@spotsccc/error-as-value`.
 2. Return expected failures as `Error | T`. Throw only at a boundary whose contract requires exceptions or for truly unexpected programmer failures.
 3. Handle errors immediately with an early exit. Keep the success path at the root indentation level.
 4. Convert exceptions to values once, at the lowest uncontrolled boundary: third-party libraries, `fetch`, file I/O, parsing, environment access, or legacy throwing code.
@@ -64,7 +64,9 @@ if (media instanceof Error) return media;
 Use a class without a constructor when callers need a distinct failure but no extra data.
 
 ```ts
-class UserLookupError extends errore.createTaggedError({
+import { createTaggedError } from '@spotsccc/error-as-value';
+
+class UserLookupError extends createTaggedError({
   name: 'UserLookupError',
   message: 'Failed to look up user',
 }) {}
@@ -79,7 +81,9 @@ The `cause` already preserves the underlying message and stack. Do not add `$det
 ### Use template properties for domain context
 
 ```ts
-class NotFoundError extends errore.createTaggedError({
+import { createTaggedError } from '@spotsccc/error-as-value';
+
+class NotFoundError extends createTaggedError({
   name: 'NotFoundError',
   message: 'User $id not found',
 }) {}
@@ -92,7 +96,9 @@ return new NotFoundError({ id });
 ### Add a custom constructor only for required structured data
 
 ```ts
-class AssetUploadError extends errore.createTaggedError({
+import { createTaggedError } from '@spotsccc/error-as-value';
+
+class AssetUploadError extends createTaggedError({
   name: 'AssetUploadError',
   message: 'Failed to upload asset',
 }) {
@@ -118,10 +124,12 @@ const response = await fetch(url).catch(
 if (response instanceof Error) return response;
 ```
 
-For a synchronous boundary, use `errore.try`:
+For a synchronous boundary, use `tryFn`:
 
 ```ts
-const config = errore.try(
+import { tryFn } from '@spotsccc/error-as-value';
+
+const config = tryFn(
   () => ConfigSchema.parse(JSON.parse(raw)),
   (cause) => new ConfigParseError({ cause }),
 );
@@ -166,21 +174,23 @@ Log an error only when it is intentionally not propagated. Do not log at every l
 
 ## Matching and causes
 
-Use `errore.matchError` only when several error types genuinely map to different outcomes. Include the `Error` fallback required for untagged errors.
+Use `matchError` only when several error types genuinely map to different outcomes. Include the `Error` fallback required for untagged errors.
 
-Use `error.findCause(ErrorClass)` on errors created by `createTaggedError`. Use `errore.findCause(error, ErrorClass)` for any `Error`. Do not copy cause fields into every wrapper for convenience.
+Use `error.findCause(ErrorClass)` on errors created by `createTaggedError`. Use `findCause(error, ErrorClass)` for any `Error`. Do not copy cause fields into every wrapper for convenience.
 
 ## Cancellation
 
-Use `errore.isAbortError(error)` instead of checking `error.name`. It walks the cause chain.
+Use `isAbortError(error)` instead of checking `error.name`. It walks the cause chain.
 
-If providing a custom abort reason, extend `errore.AbortError` so wrapped cancellation remains detectable:
+If providing a custom abort reason, extend `AbortError` so wrapped cancellation remains detectable:
 
 ```ts
-class TimeoutError extends errore.createTaggedError({
+import { AbortError, createTaggedError } from '@spotsccc/error-as-value';
+
+class TimeoutError extends createTaggedError({
   name: 'TimeoutError',
   message: 'Request timed out',
-  extends: errore.AbortError,
+  extends: AbortError,
 }) {}
 ```
 

@@ -33,7 +33,7 @@ export function unwrapOr<V, U>(value: V, fallback: U): Exclude<V, Error> | U {
 }
 
 /**
- * Pattern match on an errore value.
+ * Pattern match on an error-or-value union.
  * Handles both success and error cases.
  *
  * @example
@@ -56,7 +56,7 @@ export function match<V, R>(
 }
 
 /**
- * Partition an array of errore values into [successes, errors].
+ * Partition an array of error-or-value unions into [successes, errors].
  *
  * @example
  * const results = await Promise.all(ids.map(fetchUser))
@@ -78,7 +78,7 @@ export function partition<V>(
 }
 
 /**
- * Flatten a nested errore: (E1 | (E2 | T)) becomes (E1 | E2 | T).
+ * Flatten a nested error-or-value union: (E1 | (E2 | T)) becomes (E1 | E2 | T).
  * Useful when chaining operations that can fail.
  *
  * @example

@@ -36,7 +36,7 @@ export function mapError<V, E2 extends Error>(
 }
 
 /**
- * Chain another errore-returning function.
+ * Chain another error-returning function.
  * If the value is an error, returns it unchanged.
  * If successful, runs fn and returns its result.
  *

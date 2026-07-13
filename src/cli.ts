@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Errore CLI.
+ * error-as-value CLI.
  * Provides the `skill` command to output SKILL.md contents for LLM context.
  */
 import fs from 'node:fs'
@@ -14,13 +14,13 @@ if (command === 'skill') {
     path.dirname(fileURLToPath(import.meta.url)),
     '..',
     'skills',
-    'errore',
+    'error-as-value',
     'SKILL.md',
   )
   const content = fs.readFileSync(skillPath, 'utf-8')
   process.stdout.write(content)
 } else {
-  console.log('Usage: errore <command>')
+  console.log('Usage: error-as-value <command>')
   console.log('')
   console.log('Commands:')
   console.log('  skill    Output SKILL.md contents')

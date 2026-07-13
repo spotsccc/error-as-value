@@ -1,7 +1,12 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 
 // Types
-export type { Errore, InferError, InferValue, EnsureNotError } from './types.js'
+export type {
+  ErrorAsValue,
+  InferError,
+  InferValue,
+  EnsureNotError,
+} from './types.js'
 
 // Core functions
 export { isError, isOk, tryFn, tryFn as try, tryAsync } from './core.js'
