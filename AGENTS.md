@@ -2,7 +2,7 @@
 
 ## Type checking
 
-Always run `bun run build` to type check. Never use `--noEmit`. The build script runs `tsc` which both type checks and emits to `dist/`, keeping compiled output fresh.
+Always run `bun run build` after changing TypeScript. It type checks the package source, then emits the ESM, CommonJS, and declaration entrypoints to `dist/`.
 
 ## Effect docs
 

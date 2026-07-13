@@ -125,7 +125,7 @@ export async function renderComparisonPage(mdContent: string): Promise<string> {
   <footer class="page-footer">
     <p>
       <a href="/">errore.org</a> &middot;
-      <a href="https://github.com/remorses/errore">GitHub</a> &middot;
+      <a href="https://github.com/spotsccc/error-as-value">GitHub</a> &middot;
       <a href="https://www.npmjs.com/package/errore">npm</a>
     </p>
   </footer>

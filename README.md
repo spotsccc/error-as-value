@@ -2,6 +2,8 @@
 
 Type-safe error handling for TypeScript. Return errors instead of throwing them — as a union type (`Error | T`), not a wrapper. TypeScript's type narrowing does the rest: forget to handle an error and your code won't compile.
 
+This repository is a history-preserving fork of [remorses/errore](https://github.com/remorses/errore), maintained with both ESM and CommonJS package entrypoints and an installable agent skill.
+
 ## Why?
 
 In Go, functions return errors as values instead of throwing exceptions. errore brings the same convention to TypeScript — but instead of a tuple with two separate variables, functions return a single `Error | T` union. You check `instanceof Error` instead of `err != nil`, and TypeScript narrows the type automatically. No wrapper types like `Result<T, E>`, no monads — just plain unions and `instanceof`:
@@ -23,7 +25,19 @@ console.log(user.username) // user is User, fully narrowed
 ## Install
 
 ```sh
-npm install errore
+npm install github:spotsccc/error-as-value
+```
+
+The package keeps the upstream name `errore`, so existing imports remain unchanged.
+
+Both module systems are supported:
+
+```ts
+// ESM
+import * as errore from 'errore'
+
+// CommonJS
+const errore = require('errore')
 ```
 
 ## Agent Skill
@@ -31,13 +45,13 @@ npm install errore
 errore ships with a skill file that teaches AI coding agents the errore convention. Install it with:
 
 ```sh
-npx skills add remorses/errore
+npx skills add spotsccc/error-as-value
 ```
 
 Then add this to your `AGENTS.md`:
 
 ```
-This codebase uses the errore.org convention. ALWAYS read the errore skill before editing any code.
+This codebase uses the errore.org convention. Always read the errore skill before editing TypeScript error handling.
 ```
 
 ## Quick Start

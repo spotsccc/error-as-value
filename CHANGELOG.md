@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Restore dual ESM and CommonJS package entrypoints, including format-specific TypeScript declarations.
+- Add package smoke tests for Node.js `import` and `require` consumers.
+- Refresh and validate the bundled `errore` agent skill for installation from `spotsccc/error-as-value`.
+- Add CI coverage for build, tests, package contents, and both Node.js module systems.
+
 ## 0.14.1
 
 1. **Fixed `tryFn`/`tryAsync` catch handler accepting non-Error return values** — the `catch` callback previously required returning an `Error` subclass. It now accepts any value: returning `undefined`, `null`, or a fallback value swallows the error and widens the result union accordingly:

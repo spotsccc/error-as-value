@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+
 // Types
 export type { Errore, InferError, InferValue, EnsureNotError } from './types.js'
 

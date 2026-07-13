@@ -1,0 +1,4 @@
+interface:
+  display_name: "Errore"
+  short_description: "Typed errors as values for TypeScript"
+  default_prompt: "Use $errore to implement typed error handling without throwing expected failures."

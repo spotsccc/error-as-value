@@ -740,7 +740,7 @@ console.log("hello")
 arr.push(1)`
 
 // AI Agents skill install
-const codeSkillInstall = `npx skills add remorses/errore`
+const codeSkillInstall = `npx skills add spotsccc/error-as-value`
 
 const codeAgentsMd = `This codebase uses the errore.org convention.
 ALWAYS read the errore skill before editing any code.`
@@ -1176,9 +1176,9 @@ function Page() {
         <footer>
           <pre
             class="language-bash"
-          ><code class="language-bash">npm install errore</code></pre>
+          ><code class="language-bash">npm install github:spotsccc/error-as-value</code></pre>
           <p>
-            <a href="https://github.com/remorses/errore">GitHub</a> ·
+            <a href="https://github.com/spotsccc/error-as-value">GitHub</a> ·
             <a href="/errore-vs-effect">errore vs Effect</a> ·
             <a href="https://github.com/remorses/lintcn">lintcn</a> · Made by
             <a href="https://github.com/remorses">remorses</a>
