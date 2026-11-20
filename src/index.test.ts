@@ -727,7 +727,7 @@ describe('Error | T | null (Result + Option combined)', () => {
   })
 
   test('nullish coalescing with method calls', () => {
-    function getConfig(): ValidationError | { timeout?: number } | null {
+    function getConfig(): ValidationError | { timeout?: number | undefined } | null {
       return { timeout: undefined }
     }
 

@@ -23,3 +23,19 @@ export type InferValue<T> = T extends Error ? never : T
 export type EnsureNotError<T> = T extends Error
   ? 'Error: Value type T cannot extend Error - this would make the union ambiguous'
   : T
+
+/**
+ * The error side of V. `Extract<V, Error>` is `never` for `unknown` (so
+ * narrowing `unknown` with isError would yield never); treat `unknown` as
+ * `Error` instead. `any` and concrete unions are unchanged.
+ */
+export type ErrorsOf<V> = 0 extends 1 & V
+  ? Extract<V, Error>
+  : unknown extends V
+    ? Error
+    : Extract<V, Error>
+
+/**
+ * ErrorsOf<V> restricted to V, usable as a type predicate on a `V` parameter.
+ */
+export type NarrowErrors<V> = Extract<ErrorsOf<V>, V>

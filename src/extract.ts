@@ -1,3 +1,5 @@
+import type { ErrorsOf } from './types.js'
+
 /**
  * Extract the value or throw if it's an error.
  *
@@ -46,11 +48,11 @@ export function match<V, R>(
   value: V,
   handlers: {
     ok: (v: Exclude<V, Error>) => R
-    err: (e: Extract<V, Error>) => R
+    err: (e: ErrorsOf<V>) => R
   },
 ): R {
   if (value instanceof Error) {
-    return handlers.err(value as Extract<V, Error>)
+    return handlers.err(value as ErrorsOf<V>)
   }
   return handlers.ok(value as Exclude<V, Error>)
 }
@@ -64,12 +66,12 @@ export function match<V, R>(
  */
 export function partition<V>(
   values: V[],
-): [Exclude<V, Error>[], Extract<V, Error>[]] {
+): [Exclude<V, Error>[], ErrorsOf<V>[]] {
   const oks: Exclude<V, Error>[] = []
-  const errs: Extract<V, Error>[] = []
+  const errs: ErrorsOf<V>[] = []
   for (const v of values) {
     if (v instanceof Error) {
-      errs.push(v as Extract<V, Error>)
+      errs.push(v as ErrorsOf<V>)
     } else {
       oks.push(v as Exclude<V, Error>)
     }

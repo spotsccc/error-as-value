@@ -1,3 +1,5 @@
+import type { ErrorsOf } from './types.js'
+
 /**
  * Transform the value if not an error.
  * If the value is an error, returns it unchanged.
@@ -10,9 +12,9 @@
 export function map<V, U>(
   value: V,
   fn: (v: Exclude<V, Error>) => U,
-): Extract<V, Error> | U {
+): ErrorsOf<V> | U {
   if (value instanceof Error) {
-    return value as Extract<V, Error>
+    return value as ErrorsOf<V>
   }
   return fn(value as Exclude<V, Error>)
 }
@@ -27,10 +29,10 @@ export function map<V, U>(
  */
 export function mapError<V, E2 extends Error>(
   value: V,
-  fn: (e: Extract<V, Error>) => E2,
+  fn: (e: ErrorsOf<V>) => E2,
 ): E2 | Exclude<V, Error> {
   if (value instanceof Error) {
-    return fn(value as Extract<V, Error>)
+    return fn(value as ErrorsOf<V>)
   }
   return value as Exclude<V, Error>
 }
@@ -48,9 +50,9 @@ export function mapError<V, E2 extends Error>(
 export function andThen<V, R>(
   value: V,
   fn: (v: Exclude<V, Error>) => R,
-): Extract<V, Error> | R {
+): ErrorsOf<V> | R {
   if (value instanceof Error) {
-    return value as Extract<V, Error>
+    return value as ErrorsOf<V>
   }
   return fn(value as Exclude<V, Error>)
 }
@@ -67,9 +69,9 @@ export function andThen<V, R>(
 export async function andThenAsync<V, R>(
   value: V,
   fn: (v: Exclude<V, Error>) => Promise<R>,
-): Promise<Extract<V, Error> | R> {
+): Promise<ErrorsOf<V> | R> {
   if (value instanceof Error) {
-    return value as Extract<V, Error>
+    return value as ErrorsOf<V>
   }
   return fn(value as Exclude<V, Error>)
 }

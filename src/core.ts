@@ -1,4 +1,5 @@
 import { UnhandledError } from './error.js'
+import type { NarrowErrors } from './types.js'
 
 /**
  * Type guard: checks if value is an Error.
@@ -13,7 +14,7 @@ import { UnhandledError } from './error.js'
  * // result is narrowed to User
  * console.log(result.name)
  */
-export function isError<V>(value: V): value is Extract<V, Error> {
+export function isError<V>(value: V): value is NarrowErrors<V> {
   return value instanceof Error
 }
 
