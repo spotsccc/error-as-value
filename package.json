@@ -38,6 +38,7 @@
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "npm run clean && tsc && tsc -p tsconfig.cjs.json && node -e \"const fs = require('node:fs'); fs.copyFileSync('package.cjs.json', 'dist/cjs/package.json'); fs.chmodSync('dist/cli.js', 0o755)\"",
     "test": "vitest",
+    "typecheck:test": "tsc -p tsconfig.test.json",
     "test:package": "node scripts/verify-package.mjs",
     "test:install": "node scripts/verify-git-install.mjs",
     "prepare": "npm run build",

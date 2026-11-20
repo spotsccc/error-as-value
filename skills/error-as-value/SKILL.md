@@ -1,11 +1,26 @@
 ---
 name: error-as-value
-description: Apply the errors-as-values convention in TypeScript repositories that use @spotsccc/error-as-value or Error | T return unions. Use when implementing or reviewing typed errors, converting throwing dependencies at boundaries, adapting value errors to exception-based consumers, or handling cancellation and cause chains. Prefer the smallest useful error model. Do not introduce this convention where another error model is established unless the user requests a migration.
+description: Errors-as-values convention for TypeScript code in packages that depend on @spotsccc/error-as-value (functions return `Error | T`, callers narrow with `instanceof Error`, tagged errors via createTaggedError, tryFn/tryAsync, matchError, findCause, isAbortError). Use when writing, refactoring, or reviewing error handling in such a package — typed errors, wrapping throwing third-party/IO boundaries, cause chains, cancellation. Use ONLY when the package.json of the workspace package that owns the code lists @spotsccc/error-as-value, or that code already imports it. Do not use in projects without this dependency, even if they return `Error | T`, and never use it to introduce the library or migrate an existing error model unless the user explicitly asks.
 ---
 
 # Error as Value
 
-Use errors as values: functions return `Error | T`, callers narrow with `instanceof Error`, and expected failures do not throw.
+## Gate — check before applying anything below
+
+Workspace `package.json` files that declare `@spotsccc/error-as-value`, relative to the repository root (`(none)` = not found):
+
+!`git grep -l --full-name --untracked -F '"@spotsccc/error-as-value"' -- ':/*package.json' 2>/dev/null || grep -l -F '"@spotsccc/error-as-value"' package.json 2>/dev/null || echo "(none)"`
+
+If a raw command or an error appears above instead of a list (shell execution in skills disabled or denied), run that command yourself with Bash before continuing.
+
+1. If the list is `(none)` and the code you are touching does not import `@spotsccc/error-as-value`, stop using this skill and follow the repository's existing error model.
+2. In a monorepo, apply the convention only inside packages from the list (or packages that already import the library). Do not spread it into other packages, and do not add the dependency unless the user asked.
+3. Do not rely on memory for the API. When unsure about a signature, read the installed types: `node_modules/@spotsccc/error-as-value/dist/*.d.ts` (in pnpm workspaces resolve from the owning package, e.g. `<package>/node_modules/@spotsccc/error-as-value`). Installed types win over the examples below.
+4. Before creating an error class, look for a shared errors package or module in the repository (for example a workspace package that re-exports domain errors built on this library) and reuse its errors.
+
+## Convention
+
+Functions return `Error | T`, callers narrow with `instanceof Error`, and expected failures do not throw.
 
 ```ts
 const user = await getUser(id);
@@ -16,8 +31,8 @@ return user.name;
 
 ## Core rules
 
-1. Follow the repository's existing error convention. Import only the symbols in use directly from `@spotsccc/error-as-value`.
-2. Return expected failures as `Error | T`. Throw only at a boundary whose contract requires exceptions or for truly unexpected programmer failures.
+1. Follow the repository's existing error conventions. Import only the symbols in use directly from `@spotsccc/error-as-value`.
+2. Return expected failures as `Error | T`. Throw only at a boundary whose contract requires exceptions (framework handlers, callbacks that must throw) or for truly unexpected programmer failures.
 3. Handle errors immediately with an early exit. Keep the success path at the root indentation level.
 4. Convert exceptions to values once, at the lowest uncontrolled boundary: third-party libraries, `fetch`, file I/O, parsing, environment access, or legacy throwing code.
 5. Preserve the original failure with `cause` when wrapping it.
@@ -48,7 +63,7 @@ Do not create an error class only to:
 
 Every wrapper must add actionable context for a current consumer. Do not wrap the same failure at every layer.
 
-Add a property only when current code reads or serializes it. Search usages before adding fields or a custom constructor. Template variables are for meaningful domain values, not for duplicating the cause message.
+Add a property only when current code reads or serializes it. Search usages (Grep) before adding fields or a custom constructor. Template variables are for meaningful domain values, not for duplicating the cause message.
 
 ## Choose the smallest representation
 
@@ -79,6 +94,8 @@ const user = await lookupUser(id).catch(
 The `cause` already preserves the underlying message and stack. Do not add `$detail` only to repeat `cause.message`.
 
 ### Use template properties for domain context
+
+`$variables` in `message` become required constructor props and are interpolated into the message.
 
 ```ts
 import { createTaggedError } from '@spotsccc/error-as-value';
@@ -124,7 +141,9 @@ const response = await fetch(url).catch(
 if (response instanceof Error) return response;
 ```
 
-For a synchronous boundary, use `tryFn`:
+When the throwing code is not a single promise expression (it may throw synchronously before returning a promise, or spans several awaits), use `tryAsync(fn, catchFn)` instead.
+
+For a synchronous boundary, use `tryFn(fn, catchFn)`. Without `catchFn` it returns `UnhandledError | T`.
 
 ```ts
 import { tryFn } from '@spotsccc/error-as-value';
@@ -136,7 +155,7 @@ const config = tryFn(
 if (config instanceof Error) return config;
 ```
 
-Do not add `.catch()` around internal functions that already return errors as values.
+Do not add `.catch()` or `tryAsync` around internal functions that already return errors as values.
 
 When a boundary only needs a generic failure, a plain `Error` with `cause` is valid. A tagged class is not mandatory:
 
@@ -174,7 +193,7 @@ Log an error only when it is intentionally not propagated. Do not log at every l
 
 ## Matching and causes
 
-Use `matchError` only when several error types genuinely map to different outcomes. Include the `Error` fallback required for untagged errors.
+Use `matchError` only when several error types genuinely map to different outcomes. Include the `Error` fallback required for untagged errors. Use `matchErrorPartial` with a fallback when only some tags need distinct handling.
 
 Use `error.findCause(ErrorClass)` on errors created by `createTaggedError`. Use `findCause(error, ErrorClass)` for any `Error`. Do not copy cause fields into every wrapper for convenience.
 
@@ -195,6 +214,10 @@ class TimeoutError extends createTaggedError({
 ```
 
 Check cancellation before expensive side effects and after awaited calls that receive the signal. Keep abort and generic error checks separate when they have different handling.
+
+## Verify
+
+Run the owning package's typecheck (and its tests if behavior changed). The convention relies on the type system: a missing `instanceof Error` check usually surfaces as a type error on the success path.
 
 ## Review checklist
 
