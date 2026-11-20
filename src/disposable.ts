@@ -66,7 +66,12 @@ export class DisposableStack implements Disposable {
    */
   use<T extends Disposable | null | undefined>(value: T): T {
     if (value != null) {
-      this.defer(() => value[Symbol.dispose]())
+      // Like the native DisposableStack: read the method now, fail fast.
+      const dispose = (value as Partial<Disposable>)[Symbol.dispose]
+      if (typeof dispose !== 'function') {
+        throw new TypeError('DisposableStack.use: value is not disposable')
+      }
+      this.defer(() => dispose.call(value))
     }
     return value
   }
@@ -103,20 +108,19 @@ export class DisposableStack implements Disposable {
     if (this.#disposed) return
     this.#disposed = true
 
+    // A flag, not `firstError !== undefined`: a disposer may throw undefined.
+    let hasError = false
     let firstError: unknown = undefined
     for (let i = this.#stack.length - 1; i >= 0; i--) {
       try {
         this.#stack[i]!()
       } catch (err) {
-        if (firstError === undefined) {
-          firstError = err
-        } else {
-          firstError = buildSuppressedError(err, firstError)
-        }
+        firstError = hasError ? buildSuppressedError(err, firstError) : err
+        hasError = true
       }
     }
     this.#stack = []
-    if (firstError !== undefined) throw firstError
+    if (hasError) throw firstError
   }
 
   dispose(): void {
@@ -172,12 +176,17 @@ export class AsyncDisposableStack implements AsyncDisposable {
    */
   use<T extends AsyncDisposable | Disposable | null | undefined>(value: T): T {
     if (value != null) {
-      if (Symbol.asyncDispose in (value as object)) {
-        this.defer(
-          async () => await (value as AsyncDisposable)[Symbol.asyncDispose](),
-        )
+      // Like the native AsyncDisposableStack: read the method now, fail fast.
+      const asyncDispose = (value as Partial<AsyncDisposable>)[
+        Symbol.asyncDispose
+      ]
+      const dispose = (value as Partial<Disposable>)[Symbol.dispose]
+      if (typeof asyncDispose === 'function') {
+        this.defer(async () => await asyncDispose.call(value))
+      } else if (typeof dispose === 'function') {
+        this.defer(() => dispose.call(value))
       } else {
-        this.defer(() => (value as Disposable)[Symbol.dispose]())
+        throw new TypeError('AsyncDisposableStack.use: value is not disposable')
       }
     }
     return value
@@ -215,20 +224,19 @@ export class AsyncDisposableStack implements AsyncDisposable {
     if (this.#disposed) return
     this.#disposed = true
 
+    // A flag, not `firstError !== undefined`: a disposer may throw undefined.
+    let hasError = false
     let firstError: unknown = undefined
     for (let i = this.#stack.length - 1; i >= 0; i--) {
       try {
         await this.#stack[i]!()
       } catch (err) {
-        if (firstError === undefined) {
-          firstError = err
-        } else {
-          firstError = buildSuppressedError(err, firstError)
-        }
+        firstError = hasError ? buildSuppressedError(err, firstError) : err
+        hasError = true
       }
     }
     this.#stack = []
-    if (firstError !== undefined) throw firstError
+    if (hasError) throw firstError
   }
 
   async disposeAsync(): Promise<void> {

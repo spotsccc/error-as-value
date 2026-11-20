@@ -359,6 +359,32 @@ err.statusCode // 404
 err.toResponse() // { error: 'Resource 123 not found', code: 404 }
 ```
 
+### Tagged Base Classes
+
+A tagged error can extend another tagged error. Mark the base `extendable: true`: its `_tag`, `messageTemplate` and `fingerprint` are then typed as `string`, so every subclass (which keeps its own literal `_tag`) is assignable to the base and narrows with `instanceof`.
+
+```ts
+import { createTaggedError } from '@spotsccc/error-as-value'
+
+class AppError extends createTaggedError({ name: 'AppError', extendable: true }) {}
+
+class HttpStatusError extends createTaggedError({
+  name: 'HttpStatusError',
+  message: 'Request $method $path failed with status $status',
+  extends: AppError,
+}) {}
+
+const err = new HttpStatusError({ method: 'GET', path: '/users', status: 503 })
+err._tag // 'HttpStatusError' (literal type)
+const base: AppError = err // ok
+
+declare const res: HttpStatusError | Response
+if (res instanceof AppError) return res // HttpStatusError
+// res is Response
+```
+
+A class that is extended further must be `extendable` too (e.g. `AppError → HttpError (extendable) → NotFoundError`). In `matchError`, errors typed as an extendable base (`_tag: string`) go to the `Error` handler; their subclasses match by tag. Without `extendable`, a tagged base keeps its literal `_tag` and subclasses still work at runtime, but they are not assignable to it. `TaggedError` and `createTaggedError` classes can extend each other at runtime; assignability to the base (`extendable`) works between `createTaggedError` classes.
+
 ### Type Guards
 
 Use **instanceof checks** to narrow union types:
@@ -423,6 +449,19 @@ const posts = andThen(user, (u) => fetchPosts(u.id))
 
 // Side effects
 const logged = tap(user, (u) => console.log('Got user:', u.name))
+```
+
+### Cancellation and Timeouts
+
+`isAbortError(e)` and `isTimeoutError(e)` walk the `.cause` chain. `isAbortError` matches `AbortError` (native `DOMException` or this package's class and its subclasses); `isTimeoutError` matches errors named `TimeoutError`, including the `DOMException` that `AbortSignal.timeout(ms)` makes `fetch` reject with. Both narrow one-sidedly: the false branch keeps the error types, since a non-abort error can still be there.
+
+```ts
+const res = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+  .catch((e) => new NetworkError({ url, cause: e }))
+if (isTimeoutError(res)) return new UpstreamTimeoutError({ url, cause: res })
+if (isAbortError(res)) return 'cancelled'
+if (res instanceof Error) return res
+// res is Response
 ```
 
 ### Resource Cleanup (defer)

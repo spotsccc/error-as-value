@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.16.0
+
+### Tagged error inheritance
+
+- **Fix: a subclass of a tagged base was not a subtype of it.** `x instanceof AppError` narrowed a `HttpStatusError` to `never`, `!(x instanceof AppError)` did not exclude it, and `const a: AppError = child` failed (TS2375). Cause: the base's instance type had a literal `_tag: 'AppError'` (and literal `messageTemplate`/`fingerprint`), which the child's literals can never be assigned to; `Omit`-ing them in the child (0.15.1/0.15.2) only hid the conflict. A class's own type is fixed when it is declared, so the base has to opt in.
+- **New `createTaggedError({ ..., extendable: true })`** marks a class as a base for other tagged errors. Its `_tag` and `messageTemplate` are typed `string` and `fingerprint` `readonly [string, string]`; subclasses keep their literal `_tag`, are assignable to the base and `Error`, narrow both ways with `instanceof`, and inherit the base's fields and methods. Every class that is extended further needs the flag. Type-only: runtime behavior is unchanged.
+  ```ts
+  class AppError extends createTaggedError({ name: 'AppError', extendable: true }) {}
+  class HttpStatusError extends createTaggedError({ name: 'HttpStatusError', message: '...', extends: AppError }) {}
+  ```
+  Without the flag, a tagged base behaves as in 0.15.2 (subclasses work at runtime, keep literal tags, but are not assignable to the base).
+- `matchError` / `matchErrorPartial`: errors typed as an extendable base (`_tag: string`) go to the `Error` handler instead of turning the handler map into an index signature; subclasses still match by tag.
+- Fix: `TaggedError` and `createTaggedError` classes can extend each other and `TaggedError` can extend a `TaggedError` class. Previously the constructor threw `TypeError: Cannot use 'in' operator` and the `TaggedError` instance type reduced to `never` (TS2509). Such subclasses get correct runtime values and their own literal `_tag`/`fingerprint` types, but they are not structural subtypes of the tagged base (`extendable` subtyping is a `createTaggedError` feature).
+- Fix: a `createTaggedError` subclass of `UnhandledError` keeps its own message.
+
+### Other fixes
+
+- `isAbortError` narrows one-sidedly: the false branch no longer drops every `Error` from the union (it can still hold a non-abort error). The true branch is the error side of the input marked `AbortCaused`. Code that used the value as the success type right after `if (isAbortError(x)) return` without an `instanceof Error` check now gets a type error, as it should.
+- `unknown` keeps an error side: `isError(u)` narrows to `Error` (was `never`), `map`/`andThen`/`andThenAsync` include `Error` in the result, `mapError`/`match` get `Error` in the error callback, `partition` returns `Error[]` errors. `any` and concrete unions are unchanged.
+- `matchError` / `matchErrorPartial` only use own handler keys: a tag such as `constructor` or `toString` no longer dispatches to `Object.prototype` members.
+- `findCause` (function and method) accepts abstract error classes.
+- `DisposableStack` / `AsyncDisposableStack`: a disposer that throws `undefined` is rethrown instead of swallowed; `use()` throws a `TypeError` right away for a value without a dispose method (as the native stacks do) instead of failing at disposal.
+- The sources type check under `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess`.
+
+### Added
+
+- `isTimeoutError(error)`: walks the cause chain for an error named `TimeoutError`, such as the `DOMException` that `fetch` rejects with when `AbortSignal.timeout(ms)` fires. `isAbortError` is unchanged and does not match it.
+- Exported types `AbortCaused`, `TimeoutCaused`.
+- Consumer type tests (`type-tests/`, `bun run typecheck:types`, in CI) against the built ESM and CommonJS declarations with `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax` and `moduleResolution: nodenext`.
+
 ## 0.15.2
 
 - Fix type narrowing for subclasses of a tagged base (regression in 0.15.1): `x instanceof Error` now narrows them out of `Error | T`, and `matchError` sees their tags. The instance type intersects the `Omit`ted base with `Error` again.

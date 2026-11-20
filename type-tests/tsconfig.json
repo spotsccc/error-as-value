@@ -1,0 +1,18 @@
+{
+  // Consumer-style config: type checks the built package (dist/*.d.ts)
+  // through its own `exports`, under the strictest common settings.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "skipLibCheck": false,
+    "types": []
+  },
+  "include": ["./**/*.ts", "./**/*.cts"]
+}

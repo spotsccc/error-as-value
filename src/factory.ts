@@ -1,5 +1,12 @@
 import { findCause } from './error.js'
 import { serializeCause } from './serialize-cause.js'
+import {
+  FORWARDED_SUPER,
+  TAGGED_CLASS,
+  isTaggedClass,
+  readForwarded,
+  type ForwardedSuper,
+} from './tagged-protocol.js'
 
 /**
  * Factory API for creating tagged errors with $variable interpolation in messages.
@@ -123,29 +130,9 @@ type VarProps<Msg extends string> =
 type PropsWithCause<Msg extends string> = VarProps<Msg> & { cause?: unknown }
 
 /**
- * Marks classes built by createTaggedError. Symbol.for keeps detection working
- * when the ESM and CommonJS builds are both loaded.
- */
-const TAGGED_CLASS: unique symbol = Symbol.for(
-  '@spotsccc/error-as-value/tagged-class',
-)
-
-/**
- * Args key a tagged subclass uses to hand its final message and options to a
- * tagged base, so only the outermost class handles message, name and stack.
- */
-const FORWARDED_SUPER: unique symbol = Symbol.for(
-  '@spotsccc/error-as-value/forwarded-super',
-)
-
-type ForwardedSuper = {
-  readonly message: string
-  readonly options: { cause: unknown } | undefined
-}
-
-/**
- * Members every tagged error redefines, so they are dropped from a tagged base
- * before intersecting (otherwise conflicting `_tag` literals reduce to never).
+ * Members every tagged error redefines. A subclass of a closed (literal-tagged)
+ * base drops them from the base before intersecting, otherwise the conflicting
+ * `_tag` literals reduce the instance to never.
  */
 type TaggedOwnKeys = '_tag' | 'messageTemplate' | 'fingerprint'
 
@@ -155,14 +142,11 @@ type TaggedOwnKeys = '_tag' | 'messageTemplate' | 'fingerprint'
 type ErrorClass = new (...args: any[]) => Error
 
 /**
- * Instance type for factory-created tagged errors.
+ * Members added by createTaggedError. An extendable class widens `_tag` and
+ * `messageTemplate` to `string`, so subclasses (with their own literals) stay
+ * assignable to it.
  */
-export type FactoryTaggedErrorInstance<
-  Tag extends string,
-  Msg extends string,
-  Base extends Error = Error,
-> = // `& Error` keeps the Omit result nominally an Error, so `instanceof Error` narrows it.
-(Base extends { readonly _tag: string } ? Omit<Base, TaggedOwnKeys> & Error : Base) & {
+type TaggedMembers<Tag extends string, Msg extends string> = {
   readonly _tag: Tag
   readonly message: string
   /** The original message template with $variable placeholders (e.g. 'User $id not found') */
@@ -172,9 +156,39 @@ export type FactoryTaggedErrorInstance<
   toJSON(): object
   /** Walk the .cause chain to find an ancestor matching a specific error class. */
   findCause<T extends Error>(
-    ErrorClass: new (...args: any[]) => T,
+    ErrorClass: abstract new (...args: any[]) => T,
   ): T | undefined
-} & Readonly<VarProps<Msg>>
+}
+
+/**
+ * How the base contributes to the instance type:
+ * - extendable tagged base (`_tag: string`): kept as is, so `Base & { _tag: 'Child' }`
+ *   narrows to the child literal and the child is a structural subtype of the base;
+ * - closed tagged base (literal `_tag`): its tagged members are dropped (the child
+ *   is not a subtype; mark the base `extendable: true` for that);
+ * - any other Error class: kept as is.
+ */
+type BaseInstance<Base extends Error> = Base extends {
+  readonly _tag: infer BaseTag
+}
+  ? string extends BaseTag
+    ? Base
+    : Omit<Base, TaggedOwnKeys> & Error
+  : Base
+
+/**
+ * Instance type for factory-created tagged errors.
+ */
+export type FactoryTaggedErrorInstance<
+  Tag extends string,
+  Msg extends string,
+  Base extends Error = Error,
+  Extendable extends boolean = false,
+> = BaseInstance<Base> &
+  (true extends Extendable
+    ? TaggedMembers<string, string>
+    : TaggedMembers<Tag, Msg>) &
+  Readonly<VarProps<Msg>>
 
 /**
  * Class type returned by createTaggedError factory.
@@ -183,14 +197,15 @@ export type FactoryTaggedErrorClass<
   Tag extends string,
   Msg extends string,
   Base extends Error = Error,
+  Extendable extends boolean = false,
 > = {
   new (
     ...args: ExtractVars<Msg> extends never
       ? [args?: { cause?: unknown }]
       : [args: PropsWithCause<Msg>]
-  ): FactoryTaggedErrorInstance<Tag, Msg, Base>
+  ): FactoryTaggedErrorInstance<Tag, Msg, Base, Extendable>
   /** Type guard for this error class */
-  is(value: unknown): value is FactoryTaggedErrorInstance<Tag, Msg, Base>
+  is(value: unknown): value is FactoryTaggedErrorInstance<Tag, Msg, Base, Extendable>
   /** The tag/name of this error class */
   readonly tag: Tag
 }
@@ -219,7 +234,7 @@ const compileMessageInterpolator = (
   while ((match = regex.exec(template)) !== null) {
     staticParts.push(template.slice(lastIndex, match.index))
 
-    const varName = match[1]
+    const varName = match[1]!
     placeholders.push(varName)
 
     if (!seenVariables.has(varName)) {
@@ -352,11 +367,19 @@ export function createTaggedError<
   Name extends string,
   Msg extends string = '$message',
   BaseClass extends ErrorClass = typeof Error,
+  Extendable extends boolean = false,
 >(opts: {
   name: Name
   message?: Msg
   extends?: BaseClass
-}): FactoryTaggedErrorClass<Name, Msg, InstanceType<BaseClass>> {
+  /**
+   * Mark this class as a base for other tagged errors. Its `_tag`,
+   * `messageTemplate` and `fingerprint` are typed as `string`, so subclasses
+   * (which keep their own literals) are assignable to it and narrow with
+   * `instanceof`. Type-only: runtime behavior is the same.
+   */
+  extendable?: Extendable
+}): FactoryTaggedErrorClass<Name, Msg, InstanceType<BaseClass>, Extendable> {
   const { name: tag } = opts
   const messageTemplate = (opts.message ?? '$message') as Msg
   const BaseError = opts.extends ?? Error
@@ -394,7 +417,7 @@ export function createTaggedError<
   )
 
   // A base built by createTaggedError expects an args object, not (message, options).
-  const baseIsTagged = TAGGED_CLASS in BaseError
+  const baseIsTagged = isTaggedClass(BaseError)
 
   class Tagged extends TypedBase {
     readonly _tag: Name = tag
@@ -414,9 +437,7 @@ export function createTaggedError<
     constructor(args?: Record<string, unknown>) {
       // When a tagged subclass constructs us, it owns message, name and stack:
       // only forward to our own base and assign our template variables.
-      const forwarded = (args as Record<PropertyKey, unknown> | undefined)?.[
-        FORWARDED_SUPER
-      ] as ForwardedSuper | undefined
+      const forwarded = readForwarded(args)
       const interpolatedMessage = forwarded
         ? forwarded.message
         : interpolate(args)
@@ -460,7 +481,7 @@ export function createTaggedError<
     }
 
     findCause<T extends Error>(
-      ErrorClass: new (...args: any[]) => T,
+      ErrorClass: abstract new (...args: any[]) => T,
     ): T | undefined {
       return findCause(this, ErrorClass)
     }
@@ -488,6 +509,7 @@ export function createTaggedError<
   return Tagged as unknown as FactoryTaggedErrorClass<
     Name,
     Msg,
-    InstanceType<BaseClass>
+    InstanceType<BaseClass>,
+    Extendable
   >
 }

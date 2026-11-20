@@ -34,8 +34,14 @@ export {
   findCause,
   AbortError,
   isAbortError,
+  isTimeoutError,
 } from './error.js'
-export type { TaggedErrorInstance, TaggedErrorClass } from './error.js'
+export type {
+  TaggedErrorInstance,
+  TaggedErrorClass,
+  AbortCaused,
+  TimeoutCaused,
+} from './error.js'
 
 // Factory API for tagged errors with $variable interpolation
 export { createTaggedError } from './factory.js'

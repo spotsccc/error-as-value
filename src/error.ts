@@ -1,4 +1,12 @@
 import { serializeCause } from './serialize-cause.js'
+import type { NarrowErrors } from './types.js'
+import {
+  FORWARDED_SUPER,
+  TAGGED_CLASS,
+  isTaggedClass,
+  readForwarded,
+  type ForwardedSuper,
+} from './tagged-protocol.js'
 
 /**
  * Any class that extends Error (used by findCause)
@@ -22,7 +30,7 @@ type AnyErrorClass = new (...args: any[]) => Error
  */
 export function findCause<T extends Error>(
   error: Error,
-  ErrorClass: new (...args: any[]) => T,
+  ErrorClass: abstract new (...args: any[]) => T,
 ): T | undefined {
   const seen = new Set<Error>()
   let current: unknown = error
@@ -55,20 +63,38 @@ const isAnyTaggedError = (value: unknown): value is AnyTaggedError => {
 type ErrorClass = new (...args: any[]) => Error
 
 /**
+ * Members a tagged base redefines; dropped from a literal-tagged base so the
+ * subclass's own `_tag` does not intersect with it into never.
+ */
+type TaggedOwnKeys = '_tag' | 'messageTemplate' | 'fingerprint'
+
+/**
+ * The base's contribution to a TaggedError instance type. A tagged base (from
+ * either factory) loses its tagged members: a TaggedError's `fingerprint` is
+ * `[tag]`, which conflicts with a createTaggedError base's `[tag, template]`
+ * even when that base is extendable. Any other Error class is kept as is.
+ */
+type TaggedBaseInstance<Base extends Error> = Base extends {
+  readonly _tag: string
+}
+  ? Omit<Base, TaggedOwnKeys> & Error
+  : Base
+
+/**
  * Instance type produced by TaggedError factory
  */
 export type TaggedErrorInstance<
   Tag extends string,
   Props,
   Base extends Error = Error,
-> = Base & {
+> = TaggedBaseInstance<Base> & {
   readonly _tag: Tag
   /** Stable fingerprint for error grouping in Sentry/logging. Returns [_tag]. */
   readonly fingerprint: readonly [Tag]
   toJSON(): object
   /** Walk the .cause chain to find an ancestor matching a specific error class. */
   findCause<T extends Error>(
-    ErrorClass: new (...args: any[]) => T,
+    ErrorClass: abstract new (...args: any[]) => T,
   ): T | undefined
 } & Readonly<Props>
 
@@ -156,6 +182,9 @@ export const TaggedError: {
         'cause',
       ])
 
+      // A tagged base (either factory) expects an args object, not (message, options).
+      const baseIsTagged = isTaggedClass(ActualBase)
+
       class Tagged extends ActualBase {
         readonly _tag: Tag = tag
 
@@ -163,19 +192,39 @@ export const TaggedError: {
           return [this._tag]
         }
 
+        static readonly [TAGGED_CLASS] = true
+
         /** Type guard for this error class */
         static is(value: unknown): value is Tagged {
           return value instanceof Tagged
         }
 
         constructor(args?: Props) {
-          const message =
-            args && 'message' in args && typeof args.message === 'string'
+          // When a tagged subclass constructs us, it owns message, name and
+          // stack: only forward to our own base and assign our props.
+          const forwarded = readForwarded(args)
+          const message = forwarded
+            ? forwarded.message
+            : args && 'message' in args && typeof args.message === 'string'
               ? args.message
               : undefined
-          const cause = args && 'cause' in args ? args.cause : undefined
+          const cause = forwarded
+            ? forwarded.options?.cause
+            : args && 'cause' in args
+              ? args.cause
+              : undefined
+          const options = forwarded
+            ? forwarded.options
+            : cause !== undefined
+              ? { cause }
+              : undefined
 
-          super(message, cause !== undefined ? { cause } : undefined)
+          if (baseIsTagged) {
+            const forward: ForwardedSuper = { message: message ?? '', options }
+            super({ ...args, cause, [FORWARDED_SUPER]: forward } as never)
+          } else {
+            super(message, options)
+          }
 
           if (args) {
             for (const key of Object.keys(args)) {
@@ -187,6 +236,8 @@ export const TaggedError: {
             }
           }
 
+          if (forwarded) return
+
           Object.setPrototypeOf(this, new.target.prototype)
           this.name = tag
 
@@ -197,7 +248,7 @@ export const TaggedError: {
         }
 
         findCause<T extends Error>(
-          ErrorClass: new (...args: any[]) => T,
+          ErrorClass: abstract new (...args: any[]) => T,
         ): T | undefined {
           return findCause(this, ErrorClass)
         }
@@ -233,16 +284,43 @@ export const TaggedError: {
 export const isTaggedError = isAnyTaggedError
 
 /**
- * Handler map with required `Error` fallback for plain Error (untagged)
+ * Literal `_tag`s of the members of E. An error whose `_tag` is `string` (an
+ * extendable base) has no fixed tag to match on, so it goes to `Error`.
+ * (Written without `infer`, which breaks contextual typing of the handlers.)
+ */
+type LiteralTags<E> = E extends AnyTaggedError
+  ? string extends E['_tag']
+    ? never
+    : E['_tag']
+  : never
+
+/**
+ * Handler map with required `Error` fallback for untagged errors and
+ * extendable bases.
  */
 type MatchHandlersWithPlain<E extends Error, R> = {
-  [K in Extract<E, AnyTaggedError>['_tag']]: (err: Extract<E, { _tag: K }>) => R
+  [K in LiteralTags<E>]: (err: Extract<E, { readonly _tag: K }>) => R
 } & {
   Error: (
-    err: Exclude<E, AnyTaggedError> extends never
+    err: Exclude<E, { readonly _tag: LiteralTags<E> }> extends never
       ? Error
-      : Exclude<E, AnyTaggedError>,
+      : Exclude<E, { readonly _tag: LiteralTags<E> }>,
   ) => R
+}
+
+const hasOwn = (obj: object, key: string): boolean =>
+  Object.prototype.hasOwnProperty.call(obj, key)
+
+/**
+ * Handler registered for err's `_tag`. Own keys only, so tags such as
+ * `constructor` or `toString` never resolve to Object.prototype members.
+ */
+const taggedHandler = <R>(
+  handlers: Record<string, (e: Error) => R>,
+  err: Error,
+): ((e: Error) => R) | undefined => {
+  if (!('_tag' in err) || typeof err._tag !== 'string') return undefined
+  return hasOwn(handlers, err._tag) ? handlers[err._tag] : undefined
 }
 
 /**
@@ -261,14 +339,12 @@ export function matchError<E extends Error, R>(
   handlers: MatchHandlersWithPlain<E, R>,
 ): R {
   const h = handlers as unknown as Record<string, (e: Error) => R>
-  if ('_tag' in err && typeof err._tag === 'string') {
-    const handler = h[err._tag]
-    if (handler) {
-      return handler(err)
-    }
+  const handler = taggedHandler(h, err)
+  if (handler) {
+    return handler(err)
   }
   // Fall through to Error handler for plain Error or unknown tagged errors
-  return h['Error'](err)
+  return h['Error']!(err)
 }
 
 /**
@@ -285,14 +361,12 @@ export function matchErrorPartial<E extends Error, R>(
   fallback: (e: E) => R,
 ): R {
   const h = handlers as unknown as Record<string, (e: Error) => R>
-  if ('_tag' in err && typeof err._tag === 'string') {
-    const handler = h[err._tag]
-    if (handler) {
-      return handler(err)
-    }
+  const handler = taggedHandler(h, err)
+  if (handler) {
+    return handler(err)
   }
   // Check for Error handler before fallback
-  const errorHandler = h['Error']
+  const errorHandler = hasOwn(h, 'Error') ? h['Error'] : undefined
   if (errorHandler) {
     return errorHandler(err)
   }
@@ -323,9 +397,46 @@ export class AbortError extends Error {
 }
 
 /**
+ * Type-only brand for the true branch of isAbortError/isTimeoutError. The
+ * predicate type is a strict subtype of the error, so the false branch keeps
+ * errors that are not aborts/timeouts instead of excluding every Error.
+ */
+declare const causeBrand: unique symbol
+type CauseBrand<Kind extends string> = { readonly [causeBrand]: Kind }
+
+/** An error whose `.cause` chain contains an abort. */
+export type AbortCaused = CauseBrand<'abort'>
+
+/** An error whose `.cause` chain contains a timeout. */
+export type TimeoutCaused = CauseBrand<'timeout'>
+
+/** Walk `.cause` (cycle-safe) and test each Error. */
+const someInCauseChain = (
+  error: unknown,
+  test: (e: Error) => boolean,
+): boolean => {
+  const seen = new Set<Error>()
+  let current: unknown = error
+  while (current instanceof Error) {
+    if (seen.has(current)) break
+    seen.add(current)
+    if (test(current)) return true
+    current = current.cause
+  }
+  return false
+}
+
+/**
  * Check if an error (or any error in its `.cause` chain) is an abort error.
  * Detects native AbortError (DOMException), this package's AbortError, and any
  * tagged error that extends it.
+ *
+ * Narrows one-sidedly: the true branch is the error side of the input (marked
+ * `AbortCaused`); the false branch keeps every member, because a non-abort
+ * error can still be there.
+ *
+ * Does not match the `TimeoutError` DOMException that `AbortSignal.timeout()`
+ * produces; use `isTimeoutError` for that.
  *
  * @example
  * import { isAbortError } from '@spotsccc/error-as-value'
@@ -333,22 +444,37 @@ export class AbortError extends Error {
  * const res = await fetch(url, { signal })
  *   .catch((e) => new NetworkError({ url, cause: e }))
  * if (isAbortError(res)) {
- *   // request was aborted — timeout, user cancel, etc.
+ *   // request was aborted — user cancel, controller.abort(), etc.
  * }
  */
-export function isAbortError(error: unknown): error is Error {
-  const seen = new Set<Error>()
-  let current: unknown = error
-  while (current instanceof Error) {
-    if (seen.has(current)) break
-    seen.add(current)
-    // Native DOMException AbortError or direct AbortError (name = 'AbortError')
-    if (current.name === 'AbortError') return true
-    // Tagged errors extending AbortError (createTaggedError overrides name to _tag)
-    if (current instanceof AbortError) return true
-    current = current.cause
-  }
-  return false
+export function isAbortError<V>(
+  error: V,
+): error is NarrowErrors<V> & AbortCaused {
+  return someInCauseChain(
+    error,
+    // Native DOMException AbortError or direct AbortError (name = 'AbortError'),
+    // or a tagged error extending AbortError (createTaggedError sets name to _tag)
+    (e) => e.name === 'AbortError' || e instanceof AbortError,
+  )
+}
+
+/**
+ * Check if an error (or any error in its `.cause` chain) is a timeout: the
+ * `TimeoutError` DOMException that `AbortSignal.timeout(ms)` aborts fetch
+ * with, or any error named `TimeoutError`. Narrows one-sidedly, like
+ * isAbortError.
+ *
+ * @example
+ * const res = await fetch(url, { signal: AbortSignal.timeout(5_000) })
+ *   .catch((e) => new NetworkError({ url, cause: e }))
+ * if (isTimeoutError(res)) return new UpstreamTimeoutError({ url, cause: res })
+ * if (isAbortError(res)) return 'cancelled'
+ * if (res instanceof Error) return res
+ */
+export function isTimeoutError<V>(
+  error: V,
+): error is NarrowErrors<V> & TimeoutCaused {
+  return someInCauseChain(error, (e) => e.name === 'TimeoutError')
 }
 
 /**
@@ -363,6 +489,7 @@ export class UnhandledError extends TaggedError('UnhandledError')<{
       args.cause instanceof Error
         ? `Unhandled exception: ${args.cause.message}`
         : `Unhandled exception: ${String(args.cause)}`
-    super({ message, cause: args.cause })
+    // Spread args so a tagged subclass's forwarded message survives.
+    super({ ...args, message, cause: args.cause })
   }
 }

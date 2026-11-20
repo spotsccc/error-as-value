@@ -110,6 +110,8 @@ return new NotFoundError({ id });
 
 `id` is justified when it is useful for the message, matching, serialization, or handling.
 
+A tagged error that other tagged errors extend needs `extendable: true` (`createTaggedError({ name: 'AppError', extendable: true })`, then `extends: AppError` in subclasses), so subclasses are assignable to it; its own `_tag` is typed `string`.
+
 ### Add a custom constructor only for required structured data
 
 ```ts
@@ -199,7 +201,7 @@ Use `error.findCause(ErrorClass)` on errors created by `createTaggedError`. Use 
 
 ## Cancellation
 
-Use `isAbortError(error)` instead of checking `error.name`. It walks the cause chain.
+Use `isAbortError(error)` / `isTimeoutError(error)` (`AbortSignal.timeout`) instead of checking `error.name`. Both walk the cause chain and keep the error types in the false branch, so still return on `instanceof Error` after them.
 
 If providing a custom abort reason, extend `AbortError` so wrapped cancellation remains detectable:
 
