@@ -1,6 +1,6 @@
 {
   "name": "@spotsccc/error-as-value",
-  "version": "0.15.1",
+  "version": "0.15.2",
   "type": "module",
   "description": "Type-safe errors as values for TypeScript. Like Go, but with full type inference.",
   "repository": {
