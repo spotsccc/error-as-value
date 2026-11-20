@@ -123,6 +123,33 @@ type VarProps<Msg extends string> =
 type PropsWithCause<Msg extends string> = VarProps<Msg> & { cause?: unknown }
 
 /**
+ * Marks classes built by createTaggedError. Symbol.for keeps detection working
+ * when the ESM and CommonJS builds are both loaded.
+ */
+const TAGGED_CLASS: unique symbol = Symbol.for(
+  '@spotsccc/error-as-value/tagged-class',
+)
+
+/**
+ * Args key a tagged subclass uses to hand its final message and options to a
+ * tagged base, so only the outermost class handles message, name and stack.
+ */
+const FORWARDED_SUPER: unique symbol = Symbol.for(
+  '@spotsccc/error-as-value/forwarded-super',
+)
+
+type ForwardedSuper = {
+  readonly message: string
+  readonly options: { cause: unknown } | undefined
+}
+
+/**
+ * Members every tagged error redefines, so they are dropped from a tagged base
+ * before intersecting (otherwise conflicting `_tag` literals reduce to never).
+ */
+type TaggedOwnKeys = '_tag' | 'messageTemplate' | 'fingerprint'
+
+/**
  * Any class that extends Error
  */
 type ErrorClass = new (...args: any[]) => Error
@@ -134,7 +161,7 @@ export type FactoryTaggedErrorInstance<
   Tag extends string,
   Msg extends string,
   Base extends Error = Error,
-> = Base & {
+> = (Base extends { readonly _tag: string } ? Omit<Base, TaggedOwnKeys> : Base) & {
   readonly _tag: Tag
   readonly message: string
   /** The original message template with $variable placeholders (e.g. 'User $id not found') */
@@ -365,6 +392,9 @@ export function createTaggedError<
     (varName) => !RESERVED_KEYS.has(varName),
   )
 
+  // A base built by createTaggedError expects an args object, not (message, options).
+  const baseIsTagged = TAGGED_CLASS in BaseError
+
   class Tagged extends TypedBase {
     readonly _tag: Name = tag
     readonly messageTemplate: Msg = messageTemplate
@@ -374,16 +404,39 @@ export function createTaggedError<
     }
 
     static readonly tag: Name = tag
+    static readonly [TAGGED_CLASS] = true
 
     static is(value: unknown): value is Tagged {
       return value instanceof Tagged
     }
 
     constructor(args?: Record<string, unknown>) {
-      const interpolatedMessage = interpolate(args)
-      const cause = args && 'cause' in args ? args.cause : undefined
+      // When a tagged subclass constructs us, it owns message, name and stack:
+      // only forward to our own base and assign our template variables.
+      const forwarded = (args as Record<PropertyKey, unknown> | undefined)?.[
+        FORWARDED_SUPER
+      ] as ForwardedSuper | undefined
+      const interpolatedMessage = forwarded
+        ? forwarded.message
+        : interpolate(args)
+      const cause = forwarded
+        ? forwarded.options?.cause
+        : args && 'cause' in args
+          ? args.cause
+          : undefined
+      const options = forwarded
+        ? forwarded.options
+        : cause !== undefined
+          ? { cause }
+          : undefined
 
-      super(interpolatedMessage, cause !== undefined ? { cause } : undefined)
+      if (baseIsTagged) {
+        const forward: ForwardedSuper = { message: interpolatedMessage, options }
+        // Spread args so a custom constructor in the base still sees the props.
+        super({ ...args, cause, [FORWARDED_SUPER]: forward } as never)
+      } else {
+        super(interpolatedMessage, options)
+      }
 
       // Assign all variables as properties, skipping reserved internal keys
       if (args) {
@@ -393,6 +446,8 @@ export function createTaggedError<
           }
         }
       }
+
+      if (forwarded) return
 
       Object.setPrototypeOf(this, new.target.prototype)
       this.name = tag

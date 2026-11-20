@@ -1348,6 +1348,100 @@ describe('createTaggedError factory', () => {
     expect(err.message).toBe('Not found: user')
   })
 
+  test('extends a class built by createTaggedError', () => {
+    class AppError extends createTaggedError({
+      name: 'AppError',
+      message: 'app: $message',
+    }) {}
+    class NotFoundError extends createTaggedError({
+      name: 'NotFoundError',
+      message: 'Resource $id not found',
+      extends: AppError,
+    }) {}
+    class OtherError extends createTaggedError({
+      name: 'OtherError',
+      message: 'other',
+    }) {}
+
+    const cause = new Error('db down')
+    const err = new NotFoundError({ id: '123', cause })
+
+    const tag: 'NotFoundError' = err._tag
+    const id: string | number = err.id
+    const fingerprint: readonly ['NotFoundError', 'Resource $id not found'] =
+      err.fingerprint
+    expect(tag).toBe('NotFoundError')
+    expect(id).toBe('123')
+    expect(fingerprint).toEqual(['NotFoundError', 'Resource $id not found'])
+    expect(err.name).toBe('NotFoundError')
+    expect(err.message).toBe('Resource 123 not found')
+    expect(err.messageTemplate).toBe('Resource $id not found')
+    expect(err.cause).toBe(cause)
+    expect(err).toBeInstanceOf(NotFoundError)
+    expect(err).toBeInstanceOf(AppError)
+    expect(AppError.is(err)).toBe(true)
+    expect(NotFoundError.is(new AppError({ message: 'x' }))).toBe(false)
+    expect(OtherError.is(err)).toBe(false)
+    expect(err.stack!.split('\n')[0]).toBe(
+      'NotFoundError: Resource 123 not found',
+    )
+    expect(err.stack!.split('Caused by:')).toHaveLength(2)
+    expect(err.toJSON()).toMatchObject({
+      _tag: 'NotFoundError',
+      message: 'Resource 123 not found',
+      id: '123',
+    })
+
+    // Constructing the base on its own keeps working
+    const base = new AppError({ message: 'boom', cause })
+    expect(base.message).toBe('app: boom')
+    expect(base.stack!.split('Caused by:')).toHaveLength(2)
+  })
+
+  test('extends a tagged chain with custom base fields and constructors', () => {
+    class HttpError extends Error {
+      statusCode = 500
+    }
+    class AppError extends createTaggedError({
+      name: 'AppError',
+      extends: HttpError,
+    }) {
+      readonly seenArgs: unknown
+      constructor(args: { message: string; cause?: unknown }) {
+        super(args)
+        this.seenArgs = args
+      }
+    }
+    class RepoError extends createTaggedError({
+      name: 'RepoError',
+      message: 'repo $repo failed',
+      extends: AppError,
+    }) {}
+    class LookupError extends createTaggedError({
+      name: 'LookupError',
+      message: 'lookup $key in $repo failed',
+      extends: RepoError,
+    }) {}
+
+    const cause = new Error('timeout')
+    const err = new LookupError({ key: 'k1', repo: 'users', cause })
+
+    expect(err._tag).toBe('LookupError')
+    expect(err.name).toBe('LookupError')
+    expect(err.message).toBe('lookup k1 in users failed')
+    expect(err.key).toBe('k1')
+    expect(err.repo).toBe('users')
+    expect(err.statusCode).toBe(500)
+    expect(err.seenArgs).toMatchObject({ key: 'k1', repo: 'users', cause })
+    expect(err).toBeInstanceOf(RepoError)
+    expect(err).toBeInstanceOf(AppError)
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err.stack!.split('\n')[0]).toBe(
+      'LookupError: lookup k1 in users failed',
+    )
+    expect(err.stack!.split('Caused by:')).toHaveLength(2)
+  })
+
   test('custom base class static is() works', () => {
     class CustomError extends Error {
       custom = true

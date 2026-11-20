@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fix `createTaggedError({ extends })` with a base class that was itself built by `createTaggedError`: the subclass now passes an args object to the tagged base instead of `(message, options)` (previously a `TypeError`), only the outermost class sets `name`, `message` and the `Caused by:` stack suffix, and the instance type drops the base's `_tag`, `messageTemplate` and `fingerprint` instead of reducing to `never` (TS2509).
+- Type check test files in CI (`typecheck:test`).
+- Sync the bundled skill: dependency gate, read installed types, reuse shared error packages, `tryAsync(fn, catchFn)`, `matchErrorPartial`, verify step.
 - Rename the package and import contract to `@spotsccc/error-as-value`, with direct named imports from the package root.
 - Rename the bundled agent skill to `error-as-value`.
 - Restore dual ESM and CommonJS package entrypoints, including format-specific TypeScript declarations.
