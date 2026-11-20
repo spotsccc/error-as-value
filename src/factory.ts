@@ -161,7 +161,8 @@ export type FactoryTaggedErrorInstance<
   Tag extends string,
   Msg extends string,
   Base extends Error = Error,
-> = (Base extends { readonly _tag: string } ? Omit<Base, TaggedOwnKeys> : Base) & {
+> = // `& Error` keeps the Omit result nominally an Error, so `instanceof Error` narrows it.
+(Base extends { readonly _tag: string } ? Omit<Base, TaggedOwnKeys> & Error : Base) & {
   readonly _tag: Tag
   readonly message: string
   /** The original message template with $variable placeholders (e.g. 'User $id not found') */
