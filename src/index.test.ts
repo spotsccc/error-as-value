@@ -1398,6 +1398,48 @@ describe('createTaggedError factory', () => {
     expect(base.stack!.split('Caused by:')).toHaveLength(2)
   })
 
+  test('subclass of a tagged base narrows with instanceof Error and matchError', () => {
+    class AppError extends createTaggedError({ name: 'AppError' }) {}
+    class NotFoundError extends createTaggedError({
+      name: 'NotFoundError',
+      message: 'Resource $id not found',
+      extends: AppError,
+    }) {}
+    class ConflictError extends createTaggedError({
+      name: 'ConflictError',
+      message: 'Conflict on $id',
+      extends: AppError,
+    }) {}
+
+    const load = (id: string): NotFoundError | ConflictError | string =>
+      id === 'missing'
+        ? new NotFoundError({ id })
+        : id === 'conflict'
+          ? new ConflictError({ id })
+          : id
+
+    const describeResult = (id: string): string => {
+      const result = load(id)
+      if (result instanceof Error) {
+        return matchError(result, {
+          NotFoundError: (e) => `not found ${e.id}`,
+          ConflictError: (e) => `conflict ${e.id}`,
+          Error: (e) => `unexpected ${e.message}`,
+        })
+      }
+      // Success path must be narrowed to string only
+      const value: string = result
+      return value.toUpperCase()
+    }
+
+    expect(describeResult('missing')).toBe('not found missing')
+    expect(describeResult('conflict')).toBe('conflict conflict')
+    expect(describeResult('ok')).toBe('OK')
+
+    const asError: Error = new NotFoundError({ id: '1' })
+    expect(asError).toBeInstanceOf(AppError)
+  })
+
   test('extends a tagged chain with custom base fields and constructors', () => {
     class HttpError extends Error {
       statusCode = 500
